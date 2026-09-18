@@ -9,14 +9,23 @@ function updateItemDatalist(){
 function renderMovements(type){
   const search = document.getElementById(type==='in'?'inSearch':'outSearch').value.trim().toLowerCase();
   const list = DB.movements.filter(m=>m.type===type).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  const filtered = list.filter(m=>!search || m.itemName.toLowerCase().includes(search) || m.docNo.toLowerCase().includes(search));
+  const filtered = list.filter(m=>!search || m.itemName.toLowerCase().includes(search) || m.docNo.toLowerCase().includes(search) || (m.operator||'').toLowerCase().includes(search));
   const tbody = document.getElementById(type==='in'?'inBody':'outBody');
   tbody.innerHTML = list.length===0
-    ? `<tr class="empty-row"><td colspan="8">Belum ada catatan stok ${type==='in'?'masuk':'keluar'}.</td></tr>`
+    ? `<tr class="empty-row"><td colspan="9">Belum ada catatan stok ${type==='in'?'masuk':'keluar'}.</td></tr>`
     : filtered.length===0
-    ? `<tr class="empty-row"><td colspan="8">Tidak ditemukan.</td></tr>`
+    ? `<tr class="empty-row"><td colspan="9">Tidak ditemukan.</td></tr>`
     : filtered.map(m=>`<tr>
-        <td>${esc(m.date)}</td><td>${esc(m.docNo)}</td><td><b>${esc(m.itemName)}</b></td><td>${esc(m.party||'-')}</td><td>${type==='in'?'+':'-'}${m.qty}</td><td><span class="pill selesai">Selesai</span></td>
+        <td>${esc(m.date)}</td>
+        <td>${esc(m.docNo)}</td>
+        <td><b>${esc(m.itemName)}</b></td>
+        <td>${esc(m.party||'-')}</td>
+        <td><b>${type==='in'?'+':'-'}${m.qty}</b></td>
+        <td>
+          <div style="font-weight:600;font-size:12px;color:var(--ink);">${esc(m.operator || 'Admin')}</div>
+          <div style="font-size:10.5px;color:var(--ink-soft);">${esc(m.operatorRole || '')}</div>
+        </td>
+        <td><span class="pill selesai">Selesai</span></td>
         <td style="white-space:nowrap;color:var(--muted,#6b7280);font-size:12px;">${fmtDT(m.createdAt)}</td>
         <td><button class="btn btn-ghost btn-sm" onclick="openMovDeleteConfirm('${m.id}')">Hapus</button></td>
       </tr>`).join('');
@@ -35,6 +44,18 @@ function openMovModal(type){
   document.getElementById('movDate').value = todayStr();
   document.getElementById('movParty').value='';
   document.getElementById('movDoc').value='';
+
+  const newCatWrap = document.getElementById('movNewCatWrap');
+  if(newCatWrap) newCatWrap.style.display = type === 'in' ? 'block' : 'none';
+  const newCatInput = document.getElementById('movNewCat');
+  if(newCatInput) newCatInput.value = '';
+
+  const session = getSavedSession();
+  const opName = session?.name || DB.profile?.name || 'Administrator';
+  const opRole = session?.role || DB.currentRole || 'Administrator';
+  const opEl = document.getElementById('movOperatorName');
+  if(opEl) opEl.textContent = `${opName} (${opRole})`;
+
   movOverlay.classList.add('open');
 }
 document.getElementById('btnAddIn').addEventListener('click', ()=>openMovModal('in'));
@@ -43,28 +64,40 @@ document.getElementById('movClose').addEventListener('click', ()=>movOverlay.cla
 document.getElementById('movCancel').addEventListener('click', ()=>movOverlay.classList.remove('open'));
 // Sengaja tidak ditutup saat klik backdrop, supaya isian form Stock In/Out tidak hilang.
 
-document.getElementById('movSave').addEventListener('click', async ()=>{
-  const btn = document.getElementById('movSave');
-  if(btn.dataset.busy === '1') return; // cegah klik ganda saat masih menyimpan
+document.getElementById('movSave').addEventListener('click', ()=>{
   const itemName = document.getElementById('movItem').value.trim();
   if(!itemName){ smartekToast('Nama barang wajib diisi'); return; }
   let item = itemList().find(i=>i.name.toLowerCase()===itemName.toLowerCase());
   if(!item){
     if(movType === 'out'){
-      // Stock Out WAJIB barang yang sudah terdaftar — tidak mungkin mengeluarkan stok
-      // barang yang belum pernah tercatat sama sekali.
-      smartekToast('Barang belum terdaftar. Pilih dari daftar, atau tambahkan dulu lewat Stock In / halaman Items.');
+      smartekToast('Barang belum terdaftar. Pilih dari daftar barang.');
       return;
     }
-    // Stock In BOLEH nama bebas: kalau belum ada, otomatis buat item baru (qty awal 0,
-    // nanti langsung ditambah oleh jumlah stok masuk di bawah).
-    item = { id: uid(), name: itemName, category:'', qty:0, min:5, unit:'pcs', price:0, desc:'', photo:null, createdAt: Date.now() };
+    const enteredCat = (document.getElementById('movNewCat')?.value || '').trim();
+    item = {
+      id: uid(),
+      name: itemName,
+      category: enteredCat || 'Umum',
+      qty: 0,
+      min: 5,
+      unit: 'pcs',
+      price: 0,
+      desc: 'Didaftarkan otomatis lewat Stock In',
+      photo: null,
+      createdAt: Date.now()
+    };
   }
   const qty = Number(document.getElementById('movQty').value);
   if(!qty || qty<=0){ smartekToast('Jumlah harus lebih dari 0'); return; }
   if(movType==='out' && (Number(item.qty)||0) < qty){ smartekToast(`Stok tidak cukup. Stok tersedia: ${item.qty}`); return; }
 
-  // 1. Perbarui stok & catatan transaksi di memori & local cache instan (0ms)
+  // 1. Catat informasi akun petugas yang melakukan transaksi
+  const session = getSavedSession();
+  const operator = session?.name || DB.profile?.name || 'Administrator';
+  const operatorEmail = session?.email || DB.profile?.email || '-';
+  const operatorRole = session?.role || DB.currentRole || 'Administrator';
+
+  // 2. Perbarui stok & catatan transaksi di memori & local cache instan (0ms)
   const isNewItem = !DB.itemIds.includes(item.id);
   item.qty = movType==='in' ? (Number(item.qty)||0)+qty : (Number(item.qty)||0)-qty;
   DB.items[item.id] = item;
@@ -84,19 +117,24 @@ document.getElementById('movSave').addEventListener('click', async ()=>{
     itemName: item.name,
     qty,
     party: document.getElementById('movParty').value.trim(),
+    operator: operator,
+    operatorEmail: operatorEmail,
+    operatorRole: operatorRole,
     date: document.getElementById('movDate').value || todayStr(),
     createdAt: Date.now()
   };
   DB.movements.unshift(movement);
   localCacheSet('inv:movements', DB.movements);
 
-  // 2. Tutup modal & perbarui tampilan langsung
+  // 3. Tutup modal & perbarui tampilan langsung
   movOverlay.classList.remove('open');
-  smartekToast(movType==='in' ? 'Stok masuk berhasil dicatat!' : 'Stok keluar berhasil dicatat!');
+  smartekToast(movType==='in' 
+    ? (isNewItem ? `Item baru "${item.name}" didaftarkan & stok masuk dicatat!` : 'Stok masuk berhasil dicatat!') 
+    : 'Stok keluar berhasil dicatat!');
   renderMovements(movType);
   refreshAlertBadge();
 
-  // 3. Sinkronkan ke cloud Google Sheets di balik layar
+  // 4. Sinkronkan ke cloud Google Sheets di balik layar
   saveItem(item).catch(()=>{});
   if(isNewItem) saveIndex().catch(()=>{});
   saveMovements().catch(()=>{});

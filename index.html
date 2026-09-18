@@ -351,7 +351,6 @@
       <section class="page-section" id="page-items">
         <div class="page-head">
           <div><h2>Items</h2><div class="sub">Daftar semua item inventori</div></div>
-          <button class="btn btn-primary" id="btnAddItem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Tambah Item</button>
         </div>
         <div class="panel">
           <div class="toolbar">
@@ -388,7 +387,7 @@
         <div class="panel">
           <div class="toolbar"><div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="inSearch" placeholder="Cari barang / dokumen..."></div></div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Tanggal</th><th>No. Dokumen</th><th>Barang</th><th>Supplier/Sumber</th><th>Jumlah</th><th>Status</th><th>Dicatat</th><th></th></tr></thead>
+            <thead><tr><th>Tanggal</th><th>No. Dokumen</th><th>Barang</th><th>Supplier/Sumber</th><th>Jumlah</th><th>Petugas</th><th>Status</th><th>Dicatat</th><th></th></tr></thead>
             <tbody id="inBody"></tbody>
           </table></div>
         </div>
@@ -403,7 +402,7 @@
         <div class="panel">
           <div class="toolbar"><div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="outSearch" placeholder="Cari barang / dokumen..."></div></div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Tanggal</th><th>No. Dokumen</th><th>Barang</th><th>Tujuan</th><th>Jumlah</th><th>Status</th><th>Dicatat</th><th></th></tr></thead>
+            <thead><tr><th>Tanggal</th><th>No. Dokumen</th><th>Barang</th><th>Tujuan</th><th>Jumlah</th><th>Petugas</th><th>Status</th><th>Dicatat</th><th></th></tr></thead>
             <tbody id="outBody"></tbody>
           </table></div>
         </div>
@@ -732,7 +731,12 @@
   <div class="modal">
     <div class="modal-head"><h2 id="movModalTitle">Tambah Stok</h2><button class="close-x" id="movClose">×</button></div>
     <div class="modal-body">
-      <div class="field"><label>Barang</label><input id="movItem" list="itemListDatalist" placeholder="Ketik nama barang..."><datalist id="itemListDatalist"></datalist></div>
+      <div style="background:var(--bg,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:9px 12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:var(--ink-soft);">Akun Petugas:</span>
+        <span id="movOperatorName" style="font-size:12px;font-weight:600;color:var(--ink);">-</span>
+      </div>
+      <div class="field"><label>Barang</label><input id="movItem" list="itemListDatalist" placeholder="Ketik atau pilih nama barang..."><datalist id="itemListDatalist"></datalist></div>
+      <div id="movNewCatWrap" class="field" style="display:none;"><label>Kategori (jika barang baru)</label><input id="movNewCat" list="catList" placeholder="mis. Elektrikal, Alat Kantor, Suku Cadang"></div>
       <div class="row2">
         <div class="field"><label id="movQtyLabel">Jumlah</label><input id="movQty" type="number" min="1" value="1"></div>
         <div class="field"><label>Tanggal</label><input id="movDate" type="date"></div>

@@ -13,7 +13,8 @@ function updateItemCatOptions(){
 }
 
 function renderItems(){
-  document.getElementById('btnAddItem').style.display = canWrite() ? 'inline-flex' : 'none';
+  const btnAdd = document.getElementById('btnAddItem');
+  if(btnAdd) btnAdd.style.display = canWrite() ? 'inline-flex' : 'none';
   updateItemCatOptions();
   const search = document.getElementById('itemSearch').value.trim().toLowerCase();
   const catFilter = document.getElementById('itemFilterCat').value;
@@ -31,7 +32,7 @@ function renderItems(){
 
   const tbody = document.getElementById('itemsBody');
   tbody.innerHTML = all.length === 0
-    ? `<tr class="empty-row"><td colspan="8">Belum ada barang. Klik "Tambah Item" untuk mulai.</td></tr>`
+    ? `<tr class="empty-row"><td colspan="8">Belum ada barang. Masukkan barang melalui menu Stock In.</td></tr>`
     : filtered.length === 0
     ? `<tr class="empty-row"><td colspan="8">Tidak ada item yang cocok.</td></tr>`
     : pageItems.map(itemRowHtml).join('');
@@ -77,7 +78,10 @@ function closeItemModal(){
   document.getElementById('photoRemoveBtn').style.display='none';
   document.getElementById('itemDeleteBtn').style.display='none';
 }
-document.getElementById('btnAddItem').addEventListener('click', ()=>{ closeItemModal(); document.getElementById('itemModalTitle').textContent='Tambah Item'; itemOverlay.classList.add('open'); });
+const btnAddItem = document.getElementById('btnAddItem');
+if(btnAddItem){
+  btnAddItem.addEventListener('click', ()=>{ closeItemModal(); document.getElementById('itemModalTitle').textContent='Tambah Item'; itemOverlay.classList.add('open'); });
+}
 window.openItemEdit = function(id){
   const item = DB.items[id]; if(!item) return;
   itemEditingId = id;
