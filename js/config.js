@@ -1,5 +1,5 @@
 /* ============ CONFIGURATION & CONSTANTS ============ */
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxbx1O5zkPyL-4_bCyHBMpWkpJ2AebQb8ExFohfPDGWZSY_ukgKRAb89JeQE7bbgbrk/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXTcw0FyZ7v2xaLWTEz-yTAh0AaiSY6DQAEvBICeQxXg1DX2J016EZ1ZYFa9btzOMv/exec';
 
 const ROLES = {
   SUPER_ADMIN: 'Administrator',
