@@ -81,7 +81,9 @@ function goPage(key){
     smartekToast(`Halaman ini memerlukan akses ${PAGE_ACCESS[key].join('/')}`);
     return;
   }
+  closeMobileSidebar();
   document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === key));
+  document.querySelectorAll('.bottom-nav-item[data-bottom-page]').forEach(b => b.classList.toggle('active', b.dataset.bottomPage === key));
   document.querySelectorAll('.page-section').forEach(s => s.classList.toggle('active', s.id === 'page-' + key));
   const nav = NAV.find(n => n.key === key);
   if(nav){ document.getElementById('pageTitle').textContent = nav.title; document.getElementById('pageSubtitle').textContent = nav.sub; }
@@ -141,3 +143,18 @@ document.getElementById('notifBtn').addEventListener('click', (e)=>{
 document.addEventListener('click', (e)=>{
   if(!notifWrap.contains(e.target)) closeNotif();
 });
+
+/* ============ MOBILE NAVIGATION CONTROLS ============ */
+window.openMobileSidebar = function(){
+  document.getElementById('appSidebar')?.classList.add('open');
+  document.getElementById('sidebarBackdrop')?.classList.add('open');
+  document.body.style.overflow = 'hidden';
+};
+window.closeMobileSidebar = function(){
+  document.getElementById('appSidebar')?.classList.remove('open');
+  document.getElementById('sidebarBackdrop')?.classList.remove('open');
+  document.body.style.overflow = '';
+};
+document.getElementById('btnMobileMenu')?.addEventListener('click', openMobileSidebar);
+document.getElementById('btnCloseSidebar')?.addEventListener('click', closeMobileSidebar);
+document.getElementById('sidebarBackdrop')?.addEventListener('click', closeMobileSidebar);

@@ -235,24 +235,32 @@
   </div>
 </div>
 
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
 <div class="app">
-  <aside class="sidebar">
+  <aside class="sidebar" id="appSidebar">
     <div class="brand">
       <img src="assets/logo.png" alt="SMARTEK" class="brand-logo-img">
+      <button class="sidebar-close-btn" id="btnCloseSidebar" aria-label="Tutup Menu">✕</button>
     </div>
     <nav id="navList"></nav>
     <button class="nav-item logout-btn" onclick="handleLogout()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       Logout
     </button>
-    <div class="side-foot">SMARTEK · v1.0.0 (in-chat)</div>
+    <div class="side-foot">SMARTEK · v1.0.0</div>
   </aside>
 
   <div class="main">
     <div class="topbar">
-      <div>
-        <h1 id="pageTitle">Dashboard</h1>
-        <div class="subtitle" id="pageSubtitle">Pantau dan kelola inventori dengan mudah</div>
+      <div class="topbar-left">
+        <button class="mobile-menu-btn" id="btnMobileMenu" aria-label="Buka Menu Navigasi">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </button>
+        <div>
+          <h1 id="pageTitle">Dashboard</h1>
+          <div class="subtitle" id="pageSubtitle">Pantau dan kelola inventori dengan mudah</div>
+        </div>
       </div>
       <div class="topbar-right">
         <!-- Status Sinkronisasi Cloud -->
@@ -791,6 +799,30 @@
     <div class="modal-foot"><button class="btn btn-ghost" id="poCancel">Batal</button><button class="btn btn-primary" id="poSave">Simpan</button></div>
   </div>
 </div>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <button class="bottom-nav-item active" data-bottom-page="dashboard" onclick="goPage('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="bottom-nav-item" data-bottom-page="items" onclick="goPage('items')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>
+      <span>Items</span>
+    </button>
+    <button class="bottom-nav-item" data-bottom-page="stock-in" onclick="goPage('stock-in')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/></svg>
+      <span>Stok In</span>
+    </button>
+    <button class="bottom-nav-item" data-bottom-page="stock-out" onclick="goPage('stock-out')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+      <span>Stok Out</span>
+    </button>
+    <button class="bottom-nav-item" id="btnBottomMore" onclick="openMobileSidebar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
+      <span>Menu</span>
+    </button>
+  </nav>
 
 <div class="toast" id="toastEl"></div>
 
