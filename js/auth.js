@@ -306,14 +306,26 @@ window.enterApp = async function(role, email, password, silent = false, displayN
   if(email){
     saveSession(email, role, userName);
     // Catat lastLogin pengguna di DB.users
+    let joinedTime = Date.now();
     if(Array.isArray(DB.users)){
       const idx = DB.users.findIndex(u => (u.email || '').toLowerCase().trim() === key);
       if(idx >= 0){
         DB.users[idx].lastLogin = Date.now();
         if(password) DB.users[idx].password = password;
+        if(DB.users[idx].createdAt) joinedTime = DB.users[idx].createdAt;
         localCacheSet('inv:settings:users', DB.users);
       }
     }
+    if(DB.credentials && DB.credentials[key] && DB.credentials[key].createdAt){
+      joinedTime = DB.credentials[key].createdAt;
+    }
+    DB.profile = {
+      name: userName,
+      email: key || email,
+      role: role,
+      joined: joinedTime
+    };
+    localCacheSet('inv:settings:profile', DB.profile);
   }
 
   renderSidebarLockState();

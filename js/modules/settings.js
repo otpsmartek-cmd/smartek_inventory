@@ -273,42 +273,96 @@ async function loadProfile(){
     name:'Admin Smartek', email:'admin@smartek.co.id', role:'Administrator', joined: todayStr()
   };
 }
-function formatJoinedDate(dateStr){
+function formatJoinedDate(val){
+  if(!val) return '-';
   try{
-    const d = new Date(dateStr);
-    if(isNaN(d)) return dateStr;
+    const d = new Date(val);
+    if(isNaN(d.getTime())) return String(val);
     return d.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
-  }catch(e){ return dateStr; }
+  }catch(e){ return String(val); }
+}
+function getActiveProfile(){
+  const session = getSavedSession();
+  const sessionEmail = (session?.email || DB.profile?.email || '').toLowerCase().trim();
+  const acc = (sessionEmail && DB.credentials && DB.credentials[sessionEmail]) ? DB.credentials[sessionEmail] : null;
+  const u = (sessionEmail && Array.isArray(DB.users)) ? DB.users.find(x => (x.email || '').toLowerCase().trim() === sessionEmail) : null;
+  
+  const name = session?.name || acc?.name || u?.name || DB.profile?.name || 'Administrator';
+  const email = session?.email || u?.email || DB.profile?.email || 'admin@smartek.co.id';
+  const role = session?.role || u?.role || DB.currentRole || 'Administrator';
+  const joined = acc?.createdAt || u?.createdAt || u?.lastLogin || DB.profile?.joined || Date.now();
+  
+  return { name, email, role, joined };
 }
 function renderProfile(){
-  document.getElementById('profileName').textContent = DB.profile.name;
-  document.getElementById('profileRoleLabel').textContent = DB.profile.role;
-  document.getElementById('profileEmail').textContent = DB.profile.email;
-  document.getElementById('profileRoleValue').textContent = DB.profile.role;
-  document.getElementById('profileJoined').textContent = formatJoinedDate(DB.profile.joined);
+  const prof = getActiveProfile();
+  const nameEl = document.getElementById('profileName');
+  const roleLabel = document.getElementById('profileRoleLabel');
+  const emailEl = document.getElementById('profileEmail');
+  const roleVal = document.getElementById('profileRoleValue');
+  const joinedEl = document.getElementById('profileJoined');
+  const avatarBox = document.getElementById('profileAvatarBox');
+
+  if(nameEl) nameEl.textContent = prof.name;
+  if(roleLabel) roleLabel.textContent = prof.role;
+  if(emailEl) emailEl.textContent = prof.email;
+  if(roleVal) roleVal.textContent = prof.role;
+  if(joinedEl) joinedEl.textContent = formatJoinedDate(prof.joined);
+  
+  if(avatarBox){
+    const initial = (prof.name || 'U').trim().charAt(0).toUpperCase() || 'U';
+    avatarBox.innerHTML = `<span style="font-size:32px;font-weight:800;color:#fff;">${esc(initial)}</span>`;
+  }
 }
 window.openProfileEditModal = function(){
-  document.getElementById('peName').value = DB.profile.name;
-  document.getElementById('peEmail').value = DB.profile.email;
-  document.getElementById('peRole').value = DB.profile.role;
+  const prof = getActiveProfile();
+  document.getElementById('peName').value = prof.name;
+  document.getElementById('peEmail').value = prof.email;
+  document.getElementById('peRole').value = prof.role;
   document.getElementById('profileEditOverlay').classList.add('open');
 };
 window.closeProfileEditModal = function(){ document.getElementById('profileEditOverlay').classList.remove('open'); };
 window.saveProfileEdit = async function(){
   const name = document.getElementById('peName').value.trim();
   if(!name){ smartekToast('Nama wajib diisi'); return; }
+  const prof = getActiveProfile();
+  const emailKey = (prof.email || '').toLowerCase().trim();
+  
+  // 1. Perbarui session & DB.profile
+  saveSession(prof.email, prof.role, name);
   DB.profile = {
-    ...DB.profile,
-    name,
-    email: document.getElementById('peEmail').value.trim()
-    // Role SENGAJA tidak diikutkan di sini — peran hanya boleh berubah lewat
-    // proses login/daftar (attemptAuth), bukan diedit bebas dari form profil,
-    // supaya orang tidak bisa menaikkan perannya sendiri jadi Administrator.
+    ...prof,
+    name: name
   };
-  await storeSet('inv:settings:profile', DB.profile);
-  document.querySelector('.user .name').textContent = DB.profile.name;
-  document.querySelector('.user .avatar').textContent = DB.profile.name.trim().charAt(0).toUpperCase() || 'A';
+  localCacheSet('inv:settings:profile', DB.profile);
+  
+  // 2. Perbarui nama di DB.users
+  if(Array.isArray(DB.users)){
+    const idx = DB.users.findIndex(u => (u.email || '').toLowerCase().trim() === emailKey);
+    if(idx >= 0){
+      DB.users[idx].name = name;
+      localCacheSet('inv:settings:users', DB.users);
+      storeSet('inv:settings:users', DB.users).catch(()=>{});
+    }
+  }
+  
+  // 3. Perbarui nama di DB.credentials
+  if(DB.credentials && DB.credentials[emailKey]){
+    DB.credentials[emailKey].name = name;
+    localCacheSet('inv:auth:credentials', DB.credentials);
+    storeSet('inv:auth:credentials', DB.credentials).catch(()=>{});
+  }
+  
+  // 4. Update header
+  const nameEl = document.querySelector('.user .name');
+  const avatarEl = document.querySelector('.user .avatar');
+  if(nameEl) nameEl.textContent = name;
+  if(avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase() || 'U';
+  
   renderProfile();
   closeProfileEditModal();
-  smartekToast('Profil tersimpan');
+  smartekToast('Profil berhasil diperbarui');
 };
+
+window.renderProfile = renderProfile;
+window.getActiveProfile = getActiveProfile;
