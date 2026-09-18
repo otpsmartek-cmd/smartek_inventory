@@ -7,7 +7,67 @@ function localCacheSet(key, val){
 }
 
 /* ============ state ============ */
-let DB = { itemIds: [], items: {}, suppliers: [], purchaseOrders: [], movements: [], currentRole: 'Administrator', credentials: {} };
+let DB = {
+  itemIds: [],
+  items: {},
+  suppliers: [],
+  purchaseOrders: [],
+  movements: [],
+  currentRole: 'Administrator',
+  credentials: {},
+  profile: { name: 'Admin Smartek', email: 'admin@smartek.co.id', role: 'Administrator', joined: '' },
+  company: { name: '', address: '', phone: '', email: '' },
+  users: [],
+  warehouses: [],
+  units: ['pcs', 'box', 'kg', 'meter'],
+  notifSettings: { defaultMin: 5, badgeEnabled: true }
+};
+
+/* Memuat seluruh data dari localCache secara sinkron (0ms, instan) */
+function loadFromLocalCache(){
+  try {
+    const idx = localCacheGet('inv:index');
+    if(Array.isArray(idx)) DB.itemIds = idx;
+
+    DB.items = {};
+    for(const id of DB.itemIds){
+      const it = localCacheGet('inv:item:' + id);
+      if(it) DB.items[id] = it;
+    }
+
+    const sup = localCacheGet('inv:suppliers');
+    if(Array.isArray(sup)) DB.suppliers = sup;
+
+    const pos = localCacheGet('inv:pos');
+    if(Array.isArray(pos)) DB.purchaseOrders = pos;
+
+    const mov = localCacheGet('inv:movements');
+    if(Array.isArray(mov)) DB.movements = mov;
+
+    const prof = localCacheGet('inv:settings:profile');
+    if(prof) DB.profile = prof;
+
+    const comp = localCacheGet('inv:settings:company');
+    if(comp) DB.company = comp;
+
+    const usr = localCacheGet('inv:settings:users');
+    if(Array.isArray(usr)) DB.users = usr;
+
+    const wh = localCacheGet('inv:settings:warehouses');
+    if(Array.isArray(wh)) DB.warehouses = wh;
+
+    const un = localCacheGet('inv:settings:units');
+    if(Array.isArray(un)) DB.units = un;
+
+    const notif = localCacheGet('inv:settings:notif');
+    if(notif) DB.notifSettings = notif;
+
+    const creds = localCacheGet('inv:auth:credentials');
+    if(creds) DB.credentials = creds;
+  } catch(e){
+    console.warn('loadFromLocalCache error:', e);
+  }
+}
 
 async function loadAll(allData = null){
   if(!allData) allData = (await storeGetAll()) || {};

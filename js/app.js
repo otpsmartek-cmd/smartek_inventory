@@ -34,57 +34,70 @@ function setupLandingCopyGuard(){
 }
 
 (async function init(){
-  const allData = await storeGetAll();
-  await loadAll(allData);
-  if(allData){
-    if(allData['inv:settings:company']) DB.company = allData['inv:settings:company']; else await loadCompany();
-    if(allData['inv:settings:users']) DB.users = allData['inv:settings:users']; else await loadUsers();
-    if(allData['inv:settings:warehouses']) DB.warehouses = allData['inv:settings:warehouses']; else await loadWarehouses();
-    if(allData['inv:settings:units']) DB.units = allData['inv:settings:units']; else await loadUnits();
-    if(allData['inv:settings:notif']) DB.notifSettings = allData['inv:settings:notif']; else await loadNotifSettings();
-    if(allData['inv:settings:profile']) DB.profile = allData['inv:settings:profile']; else await loadProfile();
-    if(allData['inv:auth:credentials']) DB.credentials = allData['inv:auth:credentials']; else await loadCredentials();
-  } else {
-    await Promise.all([loadCompany(), loadUsers(), loadWarehouses(), loadUnits(), loadNotifSettings(), loadProfile(), loadCredentials()]);
-  }
-
-  // Sinkronisasi otomatis (auto-heal) antara DB.users dan DB.credentials
-  if(Array.isArray(DB.users) && DB.credentials){
-    let credsChanged = false;
-    DB.users.forEach(u => {
-      if(u.email && u.password){
-        const k = u.email.toLowerCase().trim();
-        if(!DB.credentials[k]){
-          DB.credentials[k] = { name: u.name, password: u.password, role: u.role || 'Administrator', createdAt: Date.now() };
-          credsChanged = true;
-        }
-      }
-    });
-    if(credsChanged){
-      localCacheSet('inv:auth:credentials', DB.credentials);
-      storeSet('inv:auth:credentials', DB.credentials).catch(()=>{});
-    }
-  }
-
-  document.getElementById('fMin').value = DB.notifSettings?.defaultMin || 5;
-  document.querySelector('.user .name').textContent = DB.profile.name;
-  document.querySelector('.user .role').textContent = DB.profile.role;
-  document.querySelector('.user .avatar').textContent = DB.profile.name.trim().charAt(0).toUpperCase() || 'A';
-  DB.currentRole = DB.profile.role;
-  renderSidebarLockState();
-  renderDashboard();
-  // card tilt removed for performance
   setupLandingCopyGuard();
   setupAuthKeyListeners();
   setupRealtimeSync();
 
-  // Auto-restore session jika pengguna sudah pernah login sebelumnya
+  // 1. LANGSUNG MUAT DARI CACHE LOKAL (INSTAN 0ms)
+  loadFromLocalCache();
+
+  // 2. CEK & RESTORE SESI SECARA INSTAN TANPA MENUNGGU JARINGAN
   const savedSession = getSavedSession();
   if(savedSession && savedSession.email && savedSession.role){
     enterApp(savedSession.role, savedSession.email, null, true, savedSession.name);
   }
 
-  // Tandai sesi offline saat pengguna menutup tab / browser
+  // 3. RENDER TAMPILAN DASHBOARD AWAL
+  document.getElementById('fMin').value = DB.notifSettings?.defaultMin || 5;
+  if(!savedSession){
+    document.querySelector('.user .name').textContent = DB.profile?.name || 'Admin';
+    document.querySelector('.user .role').textContent = DB.profile?.role || 'Administrator';
+    document.querySelector('.user .avatar').textContent = (DB.profile?.name || 'A').trim().charAt(0).toUpperCase() || 'A';
+    DB.currentRole = DB.profile?.role || 'Administrator';
+  }
+  renderSidebarLockState();
+  renderDashboard();
+
+  // 4. SINKRONKAN DATA TERBARU DARI CLOUD SECARA ASINKRON (DI BALIK LAYAR)
+  try{
+    const allData = await storeGetAll();
+    if(allData){
+      await loadAll(allData);
+      if(allData['inv:settings:company']) DB.company = allData['inv:settings:company'];
+      if(allData['inv:settings:users']) DB.users = allData['inv:settings:users'];
+      if(allData['inv:settings:warehouses']) DB.warehouses = allData['inv:settings:warehouses'];
+      if(allData['inv:settings:units']) DB.units = allData['inv:settings:units'];
+      if(allData['inv:settings:notif']) DB.notifSettings = allData['inv:settings:notif'];
+      if(allData['inv:settings:profile']) DB.profile = allData['inv:settings:profile'];
+      if(allData['inv:auth:credentials']) DB.credentials = allData['inv:auth:credentials'];
+
+      // Sinkronisasi otomatis (auto-heal) antara DB.users dan DB.credentials
+      if(Array.isArray(DB.users) && DB.credentials){
+        let credsChanged = false;
+        DB.users.forEach(u => {
+          if(u.email && u.password){
+            const k = u.email.toLowerCase().trim();
+            if(!DB.credentials[k]){
+              DB.credentials[k] = { name: u.name, password: u.password, role: u.role || 'Administrator', createdAt: Date.now() };
+              credsChanged = true;
+            }
+          }
+        });
+        if(credsChanged){
+          localCacheSet('inv:auth:credentials', DB.credentials);
+          storeSet('inv:auth:credentials', DB.credentials).catch(()=>{});
+        }
+      }
+
+      const activeKey = document.querySelector('.nav-item.active')?.dataset.page || 'dashboard';
+      renderPage(activeKey);
+      refreshAlertBadge();
+    }
+  }catch(e){
+    console.warn('Latar belakang sinkronisasi cloud info:', e);
+  }
+
+  // 5. Tandai sesi offline saat pengguna menutup tab / browser
   window.addEventListener('beforeunload', () => {
     sendSessionHeartbeat(false);
   });

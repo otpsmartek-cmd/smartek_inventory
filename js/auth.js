@@ -234,6 +234,7 @@ window.handleLogout = function(){
   }
   stopSessionHeartbeat();
   clearSession();
+  document.documentElement.classList.remove('user-authenticated');
   document.getElementById('landingScreen').classList.remove('hidden');
   document.getElementById('loginEmail').value = '';
   document.getElementById('loginPassword').value = '';
@@ -276,6 +277,7 @@ window.submitRoleLogin = async function(){
 };
 
 window.enterApp = async function(role, email, password, silent = false, displayName = null){
+  document.documentElement.classList.add('user-authenticated');
   document.getElementById('landingScreen').classList.add('hidden');
 
   const key = (email || '').toLowerCase().trim();
