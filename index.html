@@ -712,12 +712,22 @@
         <div class="field"><label>Satuan</label><input id="fUnit" type="text" value="pcs"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>Jumlah stok</label><input id="fQty" type="number" min="0" value="0"></div>
+        <div class="field">
+          <label style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Jumlah stok</span>
+            <span style="font-size:10px;color:#94A3B8;font-weight:500;">🔒 Terkunci (via Stok In/Out)</span>
+          </label>
+          <input id="fQty" type="number" min="0" value="0" readonly disabled style="background:#F1F5F9;color:#475569;font-weight:700;cursor:not-allowed;" title="Stok hanya dapat bertambah/berkurang melalui menu Stock In dan Stock Out">
+        </div>
         <div class="field"><label>Ambang stok rendah</label><input id="fMin" type="number" min="0" value="5"></div>
       </div>
       <div class="row2">
         <div class="field"><label>Harga (Rp)</label><input id="fPrice" type="number" min="0" placeholder="0"></div>
-        <div class="field"><label>Lokasi</label><input id="fDesc" type="text" placeholder="mis. Gudang A"></div>
+        <div class="field"><label>Lokasi</label><input id="fDesc" type="text" placeholder="mis. Rak A-02 / Gudang B"></div>
+      </div>
+      <div class="field">
+        <label>Detail / Spesifikasi Tambahan</label>
+        <textarea id="fDetail" rows="2" style="resize:vertical;min-height:56px;font-family:inherit;" placeholder="mis. Merek Omron, 24VDC 5A, Model MY4N-D2, atau catatan spesifikasi lainnya..."></textarea>
       </div>
     </div>
     <div class="modal-foot" style="justify-content:space-between;">

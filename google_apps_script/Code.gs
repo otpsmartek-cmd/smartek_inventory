@@ -112,9 +112,12 @@ function getItemsFromSheet(ss) {
     var category = String(row[3] || '').trim();
     var qty = Number(row[4]) || 0;
     var unit = String(row[5] || 'pcs').trim();
-    var min = Number(row[6]) || 5;
-    var price = Number(row[7]) || 0;
     var desc = String(row[8] || '').trim();
+    var detail = String(row[9] || '').trim();
+    // Jika kolom 9 adalah status (misal data format lama tanpa kolom detail)
+    if (['AMAN', 'RENDAH', 'HABIS'].includes(detail.toUpperCase())) {
+      detail = '';
+    }
     
     index.push(id);
     items['inv:item:' + id] = {
@@ -126,6 +129,7 @@ function getItemsFromSheet(ss) {
       min: min,
       price: price,
       desc: desc,
+      detail: detail,
       photo: null
     };
   }
@@ -242,7 +246,7 @@ function getUsersFromSheet(ss) {
 function syncItemToSheet(item) {
   if (!item || !item.id) return;
   var sheet = getOrCreateSheet(SHEET_ITEMS, [
-    "No", "ID Barang", "Nama Barang", "Kategori", "Qty Stok", "Satuan", "Min. Ambang", "Harga Satuan (Rp)", "Lokasi / Gudang", "Status Stok", "Terakhir Diperbarui (WIB)"
+    "No", "ID Barang", "Nama Barang", "Kategori", "Qty Stok", "Satuan", "Min. Ambang", "Harga Satuan (Rp)", "Lokasi / Gudang", "Detail / Spesifikasi", "Status Stok", "Terakhir Diperbarui (WIB)"
   ], "#DC2626");
 
   var data = sheet.getDataRange().getValues();
@@ -270,6 +274,7 @@ function syncItemToSheet(item) {
     min,
     price,
     item.desc || "-",
+    item.detail || "-",
     status,
     timeStr
   ];
@@ -451,12 +456,12 @@ function RAPAPIKAN_SEMUA_DATA() {
 
   if (items.length > 0) {
     var itemSheet = getOrCreateSheet(SHEET_ITEMS, [
-      "No", "ID Barang", "Nama Barang", "Kategori", "Qty Stok", "Satuan", "Min. Ambang", "Harga Satuan (Rp)", "Lokasi / Gudang", "Status Stok", "Terakhir Diperbarui (WIB)"
+      "No", "ID Barang", "Nama Barang", "Kategori", "Qty Stok", "Satuan", "Min. Ambang", "Harga Satuan (Rp)", "Lokasi / Gudang", "Detail / Spesifikasi", "Status Stok", "Terakhir Diperbarui (WIB)"
     ], "#DC2626");
     
     var lastRow = itemSheet.getLastRow();
     if (lastRow > 1) {
-      itemSheet.getRange(2, 1, lastRow - 1, 11).clearContent();
+      itemSheet.getRange(2, 1, lastRow - 1, 12).clearContent();
     }
 
     var itemRows = [];
@@ -476,19 +481,20 @@ function RAPAPIKAN_SEMUA_DATA() {
         min,
         Number(item.price) || 0,
         item.desc || '-',
+        item.detail || '-',
         status,
         timeStr
       ]);
     }
     if (itemRows.length > 0) {
-      itemSheet.getRange(2, 1, itemRows.length, 11).setValues(itemRows);
+      itemSheet.getRange(2, 1, itemRows.length, 12).setValues(itemRows);
       itemSheet.getRange(2, 1, itemRows.length, 1).setHorizontalAlignment("center");
       itemSheet.getRange(2, 5, itemRows.length, 1).setHorizontalAlignment("center");
       itemSheet.getRange(2, 7, itemRows.length, 1).setHorizontalAlignment("center");
       itemSheet.getRange(2, 8, itemRows.length, 1).setNumberFormat('"Rp"#,##0');
-      itemSheet.getRange(2, 10, itemRows.length, 1).setHorizontalAlignment("center");
+      itemSheet.getRange(2, 11, itemRows.length, 1).setHorizontalAlignment("center");
     }
-    for (var c = 1; c <= 11; c++) { itemSheet.autoResizeColumn(c); }
+    for (var c = 1; c <= 12; c++) { itemSheet.autoResizeColumn(c); }
   }
 
   // 2. Rapikan Riwayat_Stok

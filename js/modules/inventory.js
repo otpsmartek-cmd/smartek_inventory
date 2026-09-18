@@ -21,7 +21,7 @@ function renderItems(){
   const statusFilter = document.getElementById('itemFilterStatus').value;
   const all = itemList();
   let filtered = all.filter(i=>{
-    const matchSearch = !search || i.name.toLowerCase().includes(search) || (i.category||'').toLowerCase().includes(search);
+    const matchSearch = !search || i.name.toLowerCase().includes(search) || (i.category||'').toLowerCase().includes(search) || (i.desc||'').toLowerCase().includes(search) || (i.detail||'').toLowerCase().includes(search);
     const matchCat = !catFilter || i.category === catFilter;
     const matchStatus = !statusFilter || statusOf(i) === statusFilter;
     return matchSearch && matchCat && matchStatus;
@@ -52,8 +52,9 @@ window.itemsGoto = function(p){ itemsPage = Math.max(1,p); renderItems(); };
 function itemRowHtml(item){
   const st = statusOf(item);
   const thumb = item.photo ? `<img class="item-thumb" src="${item.photo}">` : `<div class="item-thumb-empty">—</div>`;
+  const detailSub = item.detail ? `<div style="font-size:11px;color:var(--ink-soft);font-weight:normal;margin-top:2px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(item.detail)}">${esc(item.detail)}</div>` : '';
   return `<tr>
-    <td><div class="name-cell">${thumb}<b>${esc(item.name)}</b></div></td>
+    <td><div class="name-cell">${thumb}<div><b>${esc(item.name)}</b>${detailSub}</div></div></td>
     <td>${esc(item.category||'-')}</td>
     <td>${item.qty||0} ${esc(item.unit||'pcs')}</td>
     <td>${rupiah(item.price)}</td>
@@ -67,7 +68,7 @@ function itemRowHtml(item){
 function closeItemModal(){
   itemOverlay.classList.remove('open');
   itemEditingId = null; itemPendingPhoto = null; itemPhotoRemoved = false;
-  ['fName','fCat','fDesc'].forEach(id=>document.getElementById(id).value='');
+  ['fName','fCat','fDesc','fDetail'].forEach(id=>{ const el = document.getElementById(id); if(el) el.value=''; });
   document.getElementById('fUnit').value='pcs';
   document.getElementById('fQty').value=0;
   document.getElementById('fMin').value=5;
@@ -93,6 +94,8 @@ window.openItemEdit = function(id){
   document.getElementById('fMin').value = item.min||0;
   document.getElementById('fPrice').value = item.price||'';
   document.getElementById('fDesc').value = item.desc||'';
+  const fDetail = document.getElementById('fDetail');
+  if(fDetail) fDetail.value = item.detail||'';
   if(item.photo){
     document.getElementById('photoPreview').src = item.photo;
     document.getElementById('photoPreview').style.display='block';
@@ -159,15 +162,17 @@ document.getElementById('itemSave').addEventListener('click', ()=>{
 
   const existing = itemEditingId ? DB.items[itemEditingId] : null;
   const isNew = !itemEditingId;
+  const detailVal = (document.getElementById('fDetail')?.value || '').trim();
   const item = {
     id: itemEditingId || uid(),
     name,
     category,
     unit: document.getElementById('fUnit').value.trim() || 'pcs',
-    qty: Number(qtyVal)||0,
+    qty: existing ? (Number(existing.qty)||0) : (Number(qtyVal)||0),
     min: Number(minVal)||0,
     price: Number(priceVal)||0,
     desc: document.getElementById('fDesc').value.trim(),
+    detail: detailVal,
     photo: itemPhotoRemoved ? null : (itemPendingPhoto || (existing ? existing.photo : null)),
     createdAt: existing ? existing.createdAt : Date.now()
   };
