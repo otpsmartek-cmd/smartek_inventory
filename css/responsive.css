@@ -1,0 +1,13 @@
+/* Responsive breakdown */
+  @media (max-width: 960px) {
+    .landing-screen { flex-direction: column; overflow-y: auto; }
+    .auth-split-right { display: none; }
+    .auth-split-left {
+      max-width: 100%; width: 100%; min-width: auto;
+      padding: 32px 24px; box-shadow: none; min-height: 100vh;
+    }
+  }
+  @media (max-width: 480px) {
+    .auth-split-left { padding: 24px 16px; }
+    .auth-title { font-size: 22px; }
+  }
