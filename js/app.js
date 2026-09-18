@@ -83,4 +83,9 @@ function setupLandingCopyGuard(){
   if(savedSession && savedSession.email && savedSession.role){
     enterApp(savedSession.role, savedSession.email, null, true, savedSession.name);
   }
+
+  // Tandai sesi offline saat pengguna menutup tab / browser
+  window.addEventListener('beforeunload', () => {
+    sendSessionHeartbeat(false);
+  });
 })();

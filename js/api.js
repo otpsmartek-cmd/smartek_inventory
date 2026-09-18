@@ -90,3 +90,108 @@ function setupRealtimeSync(){
   // Cek berkala di latar belakang setiap 25 detik
   setInterval(checkRemoteSync, 25000);
 }
+
+/* ============ USER ACTIVITY & LIVE SESSIONS (Google Sheets) ============ */
+let activeSessionTimer = null;
+let currentSessionId = null;
+
+function getClientDeviceInfo(){
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+  let browser = 'Browser';
+  if(ua.includes('Edg/')) browser = 'Microsoft Edge';
+  else if(ua.includes('Chrome/')) browser = 'Google Chrome';
+  else if(ua.includes('Safari/') && !ua.includes('Chrome/')) browser = 'Apple Safari';
+  else if(ua.includes('Firefox/')) browser = 'Mozilla Firefox';
+
+  let os = 'Unknown OS';
+  if(ua.includes('Windows')) os = 'Windows';
+  else if(ua.includes('Mac OS')) os = 'macOS';
+  else if(ua.includes('Android')) os = 'Android';
+  else if(ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+  else if(ua.includes('Linux')) os = 'Linux';
+
+  return `${browser} (${os})`;
+}
+
+function getOrCreateSessionId(){
+  if(currentSessionId) return currentSessionId;
+  try {
+    let s = sessionStorage.getItem('smartek:session_id');
+    if(!s){
+      s = 'ses_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
+      sessionStorage.setItem('smartek:session_id', s);
+    }
+    currentSessionId = s;
+    return s;
+  } catch(e){
+    currentSessionId = 'ses_' + Date.now().toString(36);
+    return currentSessionId;
+  }
+}
+
+async function recordActivity(actionType, details = {}){
+  const sessionId = getOrCreateSessionId();
+  const payload = {
+    action: 'logActivity',
+    actionType: actionType, // 'DAFTAR_BARU', 'LOGIN', 'LOGOUT'
+    userName: details.userName || DB.profile?.name || '-',
+    email: details.email || '-',
+    role: details.role || DB.currentRole || 'Administrator',
+    device: getClientDeviceInfo(),
+    sessionId: sessionId,
+    note: details.note || '-'
+  };
+
+  try{
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    }).catch(()=>{});
+  } catch(e){}
+}
+
+async function sendSessionHeartbeat(isOnline = true){
+  const session = getSavedSession();
+  if(!session && isOnline) return;
+
+  const sessionId = getOrCreateSessionId();
+  const payload = {
+    action: 'liveSession',
+    sessionId: sessionId,
+    userName: session?.name || DB.profile?.name || '-',
+    email: session?.email || '-',
+    role: session?.role || DB.currentRole || 'Administrator',
+    device: getClientDeviceInfo(),
+    isOnline: isOnline
+  };
+
+  try{
+    if(!isOnline && typeof navigator !== 'undefined' && navigator.sendBeacon){
+      navigator.sendBeacon(GAS_URL, JSON.stringify(payload));
+    } else {
+      fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        keepalive: !isOnline
+      }).catch(()=>{});
+    }
+  } catch(e){}
+}
+
+function startSessionHeartbeat(){
+  if(activeSessionTimer) clearInterval(activeSessionTimer);
+  sendSessionHeartbeat(true);
+  activeSessionTimer = setInterval(() => {
+    sendSessionHeartbeat(true);
+  }, 60000);
+}
+
+function stopSessionHeartbeat(){
+  if(activeSessionTimer){
+    clearInterval(activeSessionTimer);
+    activeSessionTimer = null;
+  }
+  sendSessionHeartbeat(false);
+}

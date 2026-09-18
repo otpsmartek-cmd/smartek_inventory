@@ -179,6 +179,10 @@ window.handleRegister = async function(){
     enterApp(role, key, password, false, name);
     smartekToast(`Selamat datang, ${name}! Akun ${role} berhasil dibuat.`);
 
+    // Catat log pendaftaran & mulai live session
+    recordActivity('DAFTAR_BARU', { userName: name, email: key, role: role, note: 'Pendaftaran mandiri' });
+    startSessionHeartbeat();
+
     // 3. Sinkronkan ke cloud secara asinkron (non-blocking)
     Promise.all([
       storeSet('inv:auth:credentials', DB.credentials),
@@ -224,6 +228,11 @@ window.toggleInputPw = function(inputId, btn){
 };
 
 window.handleLogout = function(){
+  const session = getSavedSession();
+  if(session){
+    recordActivity('LOGOUT', { userName: session.name, email: session.email, role: session.role, note: 'Pengguna keluar sistem' });
+  }
+  stopSessionHeartbeat();
   clearSession();
   document.getElementById('landingScreen').classList.remove('hidden');
   document.getElementById('loginEmail').value = '';
@@ -310,7 +319,12 @@ window.enterApp = async function(role, email, password, silent = false, displayN
     goPage('dashboard');
   }
   renderPage(document.querySelector('.nav-item.active')?.dataset.page || 'dashboard');
-  if(!silent) smartekToast(`Masuk sebagai ${role}`);
+
+  if(!silent){
+    smartekToast(`Masuk sebagai ${role}`);
+    recordActivity('LOGIN', { userName, email: key, role, note: 'Login pengguna berhasil' });
+  }
+  startSessionHeartbeat();
 };
 
 window.openForgotPassword = function(){
