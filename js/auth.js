@@ -2,9 +2,9 @@
 let pendingRole = null;
 
 /* ---- autentikasi sederhana (client-side) ----
-   Login pertama kali untuk suatu email = pendaftaran akun (password disimpan).
-   Login berikutnya wajib memakai password yang sama, minimal 6 karakter,
-   dan email harus berformat valid. */
+   Login memvalidasi kredensial pengguna yang tersimpan di DB.credentials atau DB.users.
+   Pendaftaran akun baru membuat user di DB.credentials dan DB.users dengan update optimistik (cache-first),
+   lalu sinkronisasi ke cloud Google Apps Script di latar belakang tanpa memblokir pengguna. */
 function isValidEmail(email){
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -45,57 +45,77 @@ async function loadCredentials(){
   DB.credentials = (await storeGet('inv:auth:credentials')) || {};
 }
 
+/* Helper untuk mencari akun di DB.credentials ataupun DB.users */
+function findAccount(email){
+  const key = (email || '').toLowerCase().trim();
+  if(!key) return null;
+
+  // 1. Cek di DB.credentials
+  if(DB.credentials && DB.credentials[key]){
+    const c = DB.credentials[key];
+    return {
+      email: key,
+      name: c.name || deriveNameFromEmail(key),
+      password: c.password,
+      role: c.role || 'Administrator'
+    };
+  }
+
+  // 2. Cek di DB.users (misal akun yang dibuat di Settings > Pengguna atau akun bawaan)
+  if(DB.users && Array.isArray(DB.users)){
+    const u = DB.users.find(x => (x.email || '').toLowerCase().trim() === key);
+    if(u){
+      const acc = {
+        email: key,
+        name: u.name || deriveNameFromEmail(key),
+        password: u.password,
+        role: u.role || 'Administrator'
+      };
+      // Auto-heal DB.credentials agar lookup selanjutnya instan
+      if(!DB.credentials) DB.credentials = {};
+      DB.credentials[key] = { name: acc.name, password: acc.password, role: acc.role, createdAt: Date.now() };
+      localCacheSet('inv:auth:credentials', DB.credentials);
+      storeSet('inv:auth:credentials', DB.credentials).catch(()=>{});
+      return acc;
+    }
+  }
+
+  return null;
+}
+
 async function attemptAuth(email, password, emailErrId, passwordErrId, intendedRole){
   clearFieldErrors(emailErrId, passwordErrId);
+  email = (email || '').trim();
+  password = (password || '').trim();
+
   let ok = true;
   if(!email || !isValidEmail(email)){
     showFieldError(emailErrId, 'Masukkan alamat email yang valid (contoh: nama@email.com)');
     ok = false;
   }
-  password = (password || '').trim();
   if(!password || password.length < 6){
     showFieldError(passwordErrId, 'Password minimal 6 karakter');
     ok = false;
   }
-  if(!ok) return { ok:false };
+  if(!ok) return { ok: false };
 
-  const key = email.toLowerCase();
-  const latest = (await storeGet('inv:auth:credentials')) || DB.credentials || {};
-  DB.credentials = latest;
-  const existing = DB.credentials[key];
-
-  if(existing){
-    if(existing.password !== password){
-      showFieldError(passwordErrId, 'Password tidak sesuai. Silakan periksa kembali atau klik "Lupa password?".');
-      return { ok:false };
-    }
-    if(intendedRole && existing.role && !roleTrackMatches(existing.role, intendedRole)){
-      showFieldError(passwordErrId, `Email ini terdaftar sebagai ${existing.role}. Gunakan peran yang sesuai.`);
-      return { ok:false };
-    }
-    return { ok:true, role: existing.role || intendedRole || 'Administrator' };
+  const acc = findAccount(email);
+  if(!acc){
+    showFieldError(emailErrId, 'Akun dengan email ini belum terdaftar. Silakan pilih tab "Daftar Akun" di atas untuk membuat akun baru.');
+    return { ok: false };
   }
 
-  // Akun belum terdaftar di database
-  // Jika email adalah admin default (admin@smartek.co.id) atau database akun masih kosong,
-  // jadikan Administrator default secara otomatis.
-  const isDefaultAdmin = key === 'admin@smartek.co.id';
-  const isFirstAccount = Object.keys(DB.credentials).length === 0;
-  let roleToSave = intendedRole || ((isDefaultAdmin || isFirstAccount) ? 'Administrator' : 'Pengguna');
-  
-  if(roleToSave === 'Administrator'){
-    const sudahAdaOwner = Object.values(DB.credentials).some(c => c.role === 'Administrator');
-    if(sudahAdaOwner && !isDefaultAdmin) roleToSave = 'Admin';
+  if(acc.password !== password){
+    showFieldError(passwordErrId, 'Password tidak sesuai. Silakan periksa kembali atau klik "Lupa password?".');
+    return { ok: false };
   }
 
-  const updated = { ...DB.credentials, [key]: { password, role: roleToSave, createdAt: Date.now() } };
-  const saved = await storeSet('inv:auth:credentials', updated);
-  if(!saved){
-    showFieldError(passwordErrId, 'Gagal menyimpan akun karena gangguan jaringan. Silakan coba lagi.');
-    return { ok:false };
+  if(intendedRole && acc.role && !roleTrackMatches(acc.role, intendedRole)){
+    showFieldError(passwordErrId, `Email ini terdaftar sebagai ${acc.role}. Gunakan peran yang sesuai.`);
+    return { ok: false };
   }
-  DB.credentials = updated;
-  return { ok:true, role: roleToSave };
+
+  return { ok: true, role: acc.role || 'Administrator', name: acc.name, email: acc.email };
 }
 
 window.handleLogin = async function(){
@@ -110,7 +130,7 @@ window.handleLogin = async function(){
   try{
     const result = await attemptAuth(email, password, 'loginEmailErr', 'loginPasswordErr');
     if(!result.ok) return;
-    enterApp(result.role, email, password.trim());
+    enterApp(result.role, email, password.trim(), false, result.name);
   } finally {
     if(btn){ btn.disabled = false; }
     if(txt){ txt.textContent = 'Masuk ke Sistem'; }
@@ -123,7 +143,7 @@ window.handleRegister = async function(){
   const email = document.getElementById('regEmail').value.trim();
   const password = document.getElementById('regPassword').value.trim();
   const roleEl = document.querySelector('input[name="regRole"]:checked');
-  const role = roleEl ? roleEl.value : 'Admin';
+  const role = roleEl ? roleEl.value : 'Administrator';
 
   let ok = true;
   if(!name){ showFieldError('regNameErr', 'Masukkan nama lengkap'); ok = false; }
@@ -138,21 +158,36 @@ window.handleRegister = async function(){
 
   try{
     const key = email.toLowerCase();
-    const latest = (await storeGet('inv:auth:credentials')) || DB.credentials || {};
-    if(latest[key]){
-      showFieldError('regEmailErr', 'Email ini sudah terdaftar. Silakan pilih tab "Masuk".');
+    const existing = findAccount(key);
+    if(existing){
+      showFieldError('regEmailErr', 'Email ini sudah terdaftar. Silakan beralih ke tab "Masuk".');
       return;
     }
-    const updated = { ...latest, [key]: { name, password, role, createdAt: Date.now() } };
-    const saved = await storeSet('inv:auth:credentials', updated);
-    if(!saved){
-      showFieldError('regPasswordErr', 'Gagal mendaftar karena gangguan koneksi. Silakan coba lagi.');
-      return;
-    }
-    DB.credentials = updated;
-    await syncUserFromLogin(email, password, role);
-    enterApp(role, email, password);
-    smartekToast(`Akun ${role} berhasil dibuat!`);
+
+    // 1. Simpan segera ke DB lokal (Optimistic / Cache-first)
+    const now = Date.now();
+    if(!DB.credentials) DB.credentials = {};
+    DB.credentials[key] = { name, password, role, createdAt: now };
+    localCacheSet('inv:auth:credentials', DB.credentials);
+
+    if(!Array.isArray(DB.users)) DB.users = [];
+    const newUser = { id: uid(), name, email: key, role, password, lastLogin: now };
+    DB.users = [newUser, ...DB.users.filter(u => (u.email || '').toLowerCase() !== key)];
+    localCacheSet('inv:settings:users', DB.users);
+
+    // 2. Masuk ke aplikasi langsung tanpa terblokir jeda cloud
+    enterApp(role, key, password, false, name);
+    smartekToast(`Selamat datang, ${name}! Akun ${role} berhasil dibuat.`);
+
+    // 3. Sinkronkan ke cloud secara asinkron (non-blocking)
+    Promise.all([
+      storeSet('inv:auth:credentials', DB.credentials),
+      storeSet('inv:settings:users', DB.users)
+    ]).then(() => {
+      console.log('Akun baru berhasil tersinkron ke cloud Google Sheets');
+    }).catch(err => {
+      console.warn('Gagal sinkron akun ke cloud (akan disinkronkan saat online):', err);
+    });
   } finally {
     if(btn) btn.disabled = false;
     if(txt) txt.textContent = 'Daftar Akun Baru';
@@ -228,17 +263,48 @@ window.submitRoleLogin = async function(){
   const result = await attemptAuth(email, password, 'roleLoginEmailErr', 'roleLoginPasswordErr', intendedRole);
   if(!result.ok) return;
   closeRoleLogin();
-  enterApp(result.role, email, password.trim());
+  enterApp(result.role, email, password.trim(), false, result.name);
 };
 
-window.enterApp = async function(role, email, password, silent = false){
+window.enterApp = async function(role, email, password, silent = false, displayName = null){
   document.getElementById('landingScreen').classList.add('hidden');
-  document.querySelector('.user .role').textContent = role;
+
+  const key = (email || '').toLowerCase().trim();
+  let userName = displayName;
+  if(!userName && DB.credentials && DB.credentials[key] && DB.credentials[key].name){
+    userName = DB.credentials[key].name;
+  }
+  if(!userName && DB.users && Array.isArray(DB.users)){
+    const u = DB.users.find(x => (x.email || '').toLowerCase().trim() === key);
+    if(u && u.name) userName = u.name;
+  }
+  if(!userName && email){
+    userName = deriveNameFromEmail(email);
+  }
+  if(!userName) userName = 'Pengguna';
+
+  // Update UI header profil & avatar
+  const roleEl = document.querySelector('.user .role');
+  const nameEl = document.querySelector('.user .name');
+  const avatarEl = document.querySelector('.user .avatar');
+  if(roleEl) roleEl.textContent = role;
+  if(nameEl) nameEl.textContent = userName;
+  if(avatarEl) avatarEl.textContent = userName.trim().charAt(0).toUpperCase() || 'U';
+
   DB.currentRole = role;
   if(email){
-    saveSession(email, role, DB.profile?.name);
-    if(password) await syncUserFromLogin(email, password, role);
+    saveSession(email, role, userName);
+    // Catat lastLogin pengguna di DB.users
+    if(Array.isArray(DB.users)){
+      const idx = DB.users.findIndex(u => (u.email || '').toLowerCase().trim() === key);
+      if(idx >= 0){
+        DB.users[idx].lastLogin = Date.now();
+        if(password) DB.users[idx].password = password;
+        localCacheSet('inv:settings:users', DB.users);
+      }
+    }
   }
+
   renderSidebarLockState();
   if(!isPageAllowed(document.querySelector('.nav-item.active')?.dataset.page || 'dashboard')){
     goPage('dashboard');
@@ -265,22 +331,27 @@ window.confirmResetPassword = async function(){
     return;
   }
   const key = email.toLowerCase();
-  const latest = (await storeGet('inv:auth:credentials')) || {};
-  if(!latest[key]){
+  const acc = findAccount(key);
+  if(!acc){
     showFieldError('resetEmailErr', 'Email ini belum pernah terdaftar, jadi tidak ada password yang perlu direset.');
     return;
   }
-  const updated = { ...latest };
-  delete updated[key];
-  const saved = await storeSet('inv:auth:credentials', updated);
-  if(!saved){
-    showFieldError('resetEmailErr', 'Gagal mengatur ulang karena gangguan koneksi. Silakan coba lagi.');
-    return;
+  if(DB.credentials && DB.credentials[key]){
+    delete DB.credentials[key];
+    localCacheSet('inv:auth:credentials', DB.credentials);
+    storeSet('inv:auth:credentials', DB.credentials).catch(()=>{});
   }
-  DB.credentials = updated;
+  if(DB.users && Array.isArray(DB.users)){
+    const u = DB.users.find(x => (x.email || '').toLowerCase() === key);
+    if(u){
+      delete u.password;
+      localCacheSet('inv:settings:users', DB.users);
+      storeSet('inv:settings:users', DB.users).catch(()=>{});
+    }
+  }
   closeForgotPassword();
   document.getElementById('loginEmail').value = email;
   document.getElementById('loginPassword').value = '';
   clearFieldErrors('loginEmailErr','loginPasswordErr');
-  smartekToast('Password lama sudah dihapus. Masukkan password baru lalu klik Masuk untuk mendaftar ulang.');
+  smartekToast('Password lama berhasil direset. Silakan buat password baru di tab "Daftar Akun".');
 };

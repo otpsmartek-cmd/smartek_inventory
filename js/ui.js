@@ -37,29 +37,28 @@ document.getElementById('navList').innerHTML = NAV.filter(n=>!n.hidden).map(n =>
 
 /* ============ ROLE-BASED ACCESS ============ */
 const PAGE_ACCESS = {
-  'dashboard': ['Administrator','Admin','Pengguna'],
-  'items': ['Administrator','Admin','Pengguna'],
-  'categories': ['Administrator','Admin','Pengguna'],
-  'stock-in': ['Administrator','Admin'],
-  'stock-out': ['Administrator','Admin'],
-  'suppliers': ['Administrator','Admin'],
-  'purchase-orders': ['Administrator','Admin'],
-  'reports': ['Administrator','Admin'],
-  'alerts': ['Administrator','Admin','Pengguna'],
+  'dashboard': ['Administrator','Admin','Staff Gudang','Pengguna','Viewer'],
+  'items': ['Administrator','Admin','Staff Gudang','Pengguna','Viewer'],
+  'categories': ['Administrator','Admin','Staff Gudang','Pengguna','Viewer'],
+  'stock-in': ['Administrator','Admin','Staff Gudang'],
+  'stock-out': ['Administrator','Admin','Staff Gudang'],
+  'suppliers': ['Administrator','Admin','Staff Gudang'],
+  'purchase-orders': ['Administrator','Admin','Staff Gudang'],
+  'reports': ['Administrator','Admin','Staff Gudang'],
+  'alerts': ['Administrator','Admin','Staff Gudang','Pengguna','Viewer'],
   'settings': ['Administrator'],
-  'profile': ['Administrator','Admin','Pengguna'],
+  'profile': ['Administrator','Admin','Staff Gudang','Pengguna','Viewer'],
 };
 function isPageAllowed(key){ return (PAGE_ACCESS[key]||[]).includes(DB.currentRole); }
-function canWrite(){ return DB.currentRole !== 'Pengguna'; }
-// 'Administrator' (pemilik/owner, akses penuh termasuk Settings) dan 'Admin' (staf,
-// akses operasional tapi TIDAK bisa buka Settings) berbagi "jalur" tombol landing yang sama
-// ("Masuk sebagai Admin"), jadi saat mengecek satu-email-satu-peran, keduanya dianggap
-// satu jalur yang sama supaya orang yang sudah jadi Admin/Administrator tidak ditolak
-// hanya karena label perannya beda.
+function canWrite(){
+  return DB.currentRole === 'Administrator' || DB.currentRole === 'Admin' || DB.currentRole === 'Staff Gudang';
+}
 function roleTrackMatches(existingRole, intendedRole){
   if(!intendedRole) return true;
-  if(intendedRole === 'Administrator') return existingRole === 'Administrator' || existingRole === 'Admin';
-  return existingRole === intendedRole;
+  const ex = (existingRole || '').toLowerCase();
+  const it = (intendedRole || '').toLowerCase();
+  if(it.includes('admin')) return ex.includes('admin');
+  return ex === it;
 }
 
 function renderSidebarLockState(){

@@ -31,24 +31,25 @@ function deriveNameFromEmail(email){
 /* Setiap kali ada yang berhasil login, otomatis catat/perbarui namanya di daftar
    Settings > Pengguna, lengkap dengan role dan passwordnya (disamarkan di tabel,
    bisa ditampilkan lewat tombol "Lihat"). */
-async function syncUserFromLogin(email, password, role){
-  const key = (email || '').toLowerCase();
+async function syncUserFromLogin(email, password, role, displayName = null){
+  const key = (email || '').toLowerCase().trim();
   if(!key) return;
-  const latest = (await storeGet('inv:settings:users')) || DB.users || [];
-  const list = Array.isArray(latest) ? [...latest] : [];
-  const idx = list.findIndex(u => (u.email || '').toLowerCase() === key);
+  const list = Array.isArray(DB.users) ? [...DB.users] : [];
+  const idx = list.findIndex(u => (u.email || '').toLowerCase().trim() === key);
   const now = Date.now();
+  const name = displayName || (idx >= 0 && list[idx].name ? list[idx].name : deriveNameFromEmail(email));
   if(idx >= 0){
-    list[idx] = { ...list[idx], role, password, lastLogin: now };
+    list[idx] = { ...list[idx], name, role, password: password || list[idx].password, lastLogin: now };
   } else {
-    list.unshift({ id: uid(), name: deriveNameFromEmail(email), email, role, password, lastLogin: now });
+    list.unshift({ id: uid(), name, email: key, role, password, lastLogin: now });
   }
-  const saved = await storeSet('inv:settings:users', list);
-  if(saved){
-    DB.users = list;
-    const overlay = document.getElementById('usersOverlay');
-    if(overlay && overlay.classList.contains('open')) renderUsers();
-  }
+  DB.users = list;
+  localCacheSet('inv:settings:users', list);
+  const overlay = document.getElementById('usersOverlay');
+  if(overlay && overlay.classList.contains('open')) renderUsers();
+
+  // Background sync ke server
+  storeSet('inv:settings:users', list).catch(()=>{});
 }
 function renderUsers(){
   document.getElementById('usersBody').innerHTML = DB.users.length === 0
@@ -79,30 +80,55 @@ window.openUsersModal = function(){ renderUsers(); document.getElementById('user
 window.closeUsersModal = function(){ document.getElementById('usersOverlay').classList.remove('open'); };
 window.addUser = async function(){
   const btn = document.getElementById('addUserBtn');
-  if(btn.dataset.busy === '1') return;
+  if(btn && btn.dataset.busy === '1') return;
   const name = document.getElementById('userName').value.trim();
   const email = document.getElementById('userEmail').value.trim();
   const role = document.getElementById('userRole').value;
-  if(!name){ smartekToast('Nama pengguna wajib diisi'); return; }
+  const pwInput = document.getElementById('userPassword');
+  const password = (pwInput && pwInput.value.trim()) ? pwInput.value.trim() : '123456';
 
-  btn.dataset.busy = '1'; btn.disabled = true;
-  const originalLabel = btn.textContent; btn.textContent = 'Menyimpan...';
-  try{
-    DB.users.unshift({ id: uid(), name, email, role });
-    await storeSet('inv:settings:users', DB.users);
-    document.getElementById('userName').value='';
-    document.getElementById('userEmail').value='';
-    renderUsers();
-    smartekToast('Pengguna ditambahkan');
-  } finally {
-    btn.disabled = false; btn.textContent = originalLabel; btn.dataset.busy = '0';
-  }
+  if(!name){ smartekToast('Nama pengguna wajib diisi'); return; }
+  if(!email || !isValidEmail(email)){ smartekToast('Alamat email tidak valid'); return; }
+
+  const key = email.toLowerCase();
+  const newUser = { id: uid(), name, email: key, role, password, lastLogin: null };
+  DB.users = [newUser, ...(DB.users || []).filter(u => (u.email || '').toLowerCase() !== key)];
+  localCacheSet('inv:settings:users', DB.users);
+
+  // Sinkronkan ke DB.credentials
+  if(!DB.credentials) DB.credentials = {};
+  DB.credentials[key] = { name, password, role, createdAt: Date.now() };
+  localCacheSet('inv:auth:credentials', DB.credentials);
+
+  renderUsers();
+  document.getElementById('userName').value = '';
+  document.getElementById('userEmail').value = '';
+  if(pwInput) pwInput.value = '';
+  smartekToast('Pengguna berhasil ditambahkan!');
+
+  // Non-blocking sync ke cloud
+  Promise.all([
+    storeSet('inv:settings:users', DB.users),
+    storeSet('inv:auth:credentials', DB.credentials)
+  ]).catch(()=>{});
 };
 window.deleteUser = async function(id){
+  const target = DB.users.find(u => u.id === id);
   DB.users = DB.users.filter(u=>u.id!==id);
-  await storeSet('inv:settings:users', DB.users);
+  localCacheSet('inv:settings:users', DB.users);
+
+  if(target && target.email){
+    const key = target.email.toLowerCase().trim();
+    if(DB.credentials && DB.credentials[key]){
+      delete DB.credentials[key];
+      localCacheSet('inv:auth:credentials', DB.credentials);
+      storeSet('inv:auth:credentials', DB.credentials).catch(()=>{});
+    }
+  }
+
   renderUsers();
   smartekToast('Pengguna dihapus');
+  storeSet('inv:settings:users', DB.users).catch(()=>{});
 };
 
 /* ============ SETTINGS: Gudang ============ */
