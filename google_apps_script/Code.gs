@@ -1,18 +1,16 @@
 /**
  * =========================================================================
- * SMARTEK INVENTORY - BACKEND GOOGLE APPS SCRIPT (MULTI-TAB DATABASE)
+ * SMARTEK INVENTORY - BACKEND GOOGLE APPS SCRIPT (HYBRID TABULAR DATABASE)
  * =========================================================================
  * 
- * Sistem ini secara otomatis memisahkan data menjadi tab-tab rapi,
- * bersih, berwarna, dan mudah dibaca oleh manusia:
- * 
- * 1. [Data_Barang]         : Katalog master item, stok, satuan, harga, lokasi, status
+ * Sistem ini membaca & menulis langsung ke tab-tab spreadsheet rapi:
+ * 1. [Data_Barang]         : Master katalog barang, stok, satuan, harga, lokasi
  * 2. [Riwayat_Stok]        : Seluruh transaksi Stock In & Out lengkap dengan akun petugas
  * 3. [Data_Supplier]       : Daftar kontak pemasok
  * 4. [Pengguna_Sistem]     : Daftar user & peran
  * 5. [Aktivitas_Pengguna]  : Log audit pendaftaran, login, logout
  * 6. [Sesi_Aktif]          : Live monitoring status online / offline real-time
- * 7. [_System_Storage]     : Tab engine data (Key-Value) di posisi paling belakang
+ * 7. [_System_Storage]     : Tab teknis konfigurasi & credentials di posisi paling belakang
  */
 
 var SHEET_SYSTEM    = "_System_Storage";
@@ -34,30 +32,46 @@ function onOpen() {
 }
 
 /**
- * Helper: Ambil atau buat sheet sistem (_System_Storage)
+ * Helper: Ambil sheet sistem (_System_Storage) dengan aman tanpa salah ambil tab Data_Barang
  */
 function getDatabaseSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. Cari sheet bernama "_System_Storage"
   var sheet = ss.getSheetByName(SHEET_SYSTEM);
-  if (!sheet) {
-    sheet = ss.getSheetByName("Database_Storage");
+  if (sheet) return sheet;
+  
+  // 2. Cari sheet bernama "Database_Storage"
+  sheet = ss.getSheetByName("Database_Storage");
+  if (sheet) {
+    try { sheet.setName(SHEET_SYSTEM); } catch(e) {}
+    return sheet;
   }
-  if (!sheet) {
-    sheet = ss.getSheetByName("Sheet1");
-  }
-  if (!sheet) {
-    sheet = ss.getSheets()[0];
-  }
-  try {
-    if (sheet.getName() !== SHEET_SYSTEM) {
-      sheet.setName(SHEET_SYSTEM);
+  
+  // 3. Cari sheet yang baris A1 nya bertuliskan 'key'
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    var s = sheets[i];
+    var name = s.getName();
+    if (name === SHEET_ITEMS || name === SHEET_MOVEMENTS || name === SHEET_SUPPLIERS || name === SHEET_USERS || name === SHEET_LOG || name === SHEET_SESSION) {
+      continue; // Lewati tab tabular tampilan
     }
-  } catch(e) {}
-  return sheet;
+    var firstCell = String(s.getRange("A1").getValue() || '').trim().toLowerCase();
+    if (firstCell === 'key' || firstCell.indexOf('inv:') === 0) {
+      try { s.setName(SHEET_SYSTEM); } catch(e) {}
+      return s;
+    }
+  }
+  
+  // 4. Jika belum ada, buat sheet _System_Storage baru di posisi paling belakang
+  var newSheet = ss.insertSheet(SHEET_SYSTEM, ss.getNumSheets());
+  newSheet.appendRow(["key", "value", "updatedAt"]);
+  newSheet.setTabColor("#64748B");
+  return newSheet;
 }
 
 /**
- * Helper: Ambil atau buat sheet bertabel dengan header berwana & rapi
+ * Helper: Ambil atau buat sheet bertabel dengan header berwarna & rapi
  */
 function getOrCreateSheet(sheetName, headers, headerColor) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -76,7 +90,151 @@ function getOrCreateSheet(sheetName, headers, headerColor) {
   return sheet;
 }
 
-/* ==================== SINKRONISASI KE TAB TABULAR RAPI ==================== */
+/* ==================== PARSER DARI TAB SPREADSHEET KE OBJEK WEB ==================== */
+
+/**
+ * Membaca seluruh data barang dari tab [Data_Barang]
+ */
+function getItemsFromSheet(ss) {
+  var sheet = ss.getSheetByName(SHEET_ITEMS);
+  if (!sheet) return { index: [], items: {} };
+  var data = sheet.getDataRange().getValues();
+  var index = [];
+  var items = {};
+  
+  // Baris 0 adalah Header: No, ID Barang, Nama Barang, Kategori, Qty Stok, Satuan, Min. Ambang, Harga Satuan, Lokasi / Gudang, Status Stok, Terakhir Diperbarui
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var id = String(row[1] || '').trim();
+    if (!id || id === 'ID Barang') continue;
+    
+    var name = String(row[2] || '').trim();
+    var category = String(row[3] || '').trim();
+    var qty = Number(row[4]) || 0;
+    var unit = String(row[5] || 'pcs').trim();
+    var min = Number(row[6]) || 5;
+    var price = Number(row[7]) || 0;
+    var desc = String(row[8] || '').trim();
+    
+    index.push(id);
+    items['inv:item:' + id] = {
+      id: id,
+      name: name,
+      category: category,
+      qty: qty,
+      unit: unit,
+      min: min,
+      price: price,
+      desc: desc,
+      photo: null
+    };
+  }
+  return { index: index, items: items };
+}
+
+/**
+ * Membaca seluruh catatan pergerakan stok dari tab [Riwayat_Stok]
+ */
+function getMovementsFromSheet(ss) {
+  var sheet = ss.getSheetByName(SHEET_MOVEMENTS);
+  if (!sheet) return [];
+  var data = sheet.getDataRange().getValues();
+  var movements = [];
+  
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var docNo = String(row[1] || '').trim();
+    if (!docNo || docNo === 'No. Dokumen') continue;
+    
+    var date = String(row[2] || '').trim();
+    var tipeRaw = String(row[3] || '').toLowerCase();
+    var type = tipeRaw.indexOf('keluar') >= 0 ? 'out' : 'in';
+    var itemName = String(row[4] || '').trim();
+    var qtyStr = String(row[5] || '').replace(/[^0-9]/g, '');
+    var qty = Number(qtyStr) || 0;
+    var party = String(row[6] || '').trim();
+    var operator = String(row[7] || '').trim();
+    var operatorEmail = String(row[8] || '').trim();
+    var operatorRole = String(row[9] || '').trim();
+    
+    movements.push({
+      id: 'mov_' + i,
+      docNo: docNo,
+      date: date,
+      type: type,
+      itemName: itemName,
+      qty: qty,
+      party: party,
+      operator: operator,
+      operatorEmail: operatorEmail,
+      operatorRole: operatorRole,
+      createdAt: Date.now() - (i * 1000)
+    });
+  }
+  return movements;
+}
+
+/**
+ * Membaca data supplier dari tab [Data_Supplier]
+ */
+function getSuppliersFromSheet(ss) {
+  var sheet = ss.getSheetByName(SHEET_SUPPLIERS);
+  if (!sheet) return [];
+  var data = sheet.getDataRange().getValues();
+  var suppliers = [];
+  
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var id = String(row[1] || '').trim();
+    var name = String(row[2] || '').trim();
+    if (!name || name === 'Nama Supplier') continue;
+    
+    var contact = String(row[3] || '').trim();
+    var phone = String(row[4] || '').trim();
+    var status = String(row[5] || 'aktif').trim().toLowerCase();
+    
+    suppliers.push({
+      id: id || ('sup_' + i),
+      name: name,
+      contact: contact,
+      phone: phone,
+      status: status,
+      createdAt: Date.now()
+    });
+  }
+  return suppliers;
+}
+
+/**
+ * Membaca data pengguna dari tab [Pengguna_Sistem]
+ */
+function getUsersFromSheet(ss) {
+  var sheet = ss.getSheetByName(SHEET_USERS);
+  if (!sheet) return [];
+  var data = sheet.getDataRange().getValues();
+  var users = [];
+  
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var id = String(row[1] || '').trim();
+    var name = String(row[2] || '').trim();
+    var email = String(row[3] || '').trim();
+    if (!email || email === 'Email') continue;
+    
+    var role = String(row[4] || 'Pengguna').trim();
+    
+    users.push({
+      id: id || ('user_' + i),
+      name: name,
+      email: email,
+      role: role,
+      lastLogin: Date.now()
+    });
+  }
+  return users;
+}
+
+/* ==================== SINKRONISASI DARI WEB KE TAB SPREADSHEET ==================== */
 
 /**
  * Update 1 item di tab 'Data_Barang'
@@ -85,7 +243,7 @@ function syncItemToSheet(item) {
   if (!item || !item.id) return;
   var sheet = getOrCreateSheet(SHEET_ITEMS, [
     "No", "ID Barang", "Nama Barang", "Kategori", "Qty Stok", "Satuan", "Min. Ambang", "Harga Satuan (Rp)", "Lokasi / Gudang", "Status Stok", "Terakhir Diperbarui (WIB)"
-  ], "#DC2626"); // Merah Smartek
+  ], "#DC2626");
 
   var data = sheet.getDataRange().getValues();
   var rowIndex = -1;
@@ -129,13 +287,35 @@ function syncItemToSheet(item) {
 }
 
 /**
+ * Hapus baris item dari Data_Barang jika ID tidak ada lagi di index
+ */
+function cleanItemsNotInIndex(activeIds) {
+  if (!activeIds || !Array.isArray(activeIds)) return;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_ITEMS);
+  if (!sheet) return;
+  var data = sheet.getDataRange().getValues();
+  for (var i = data.length - 1; i >= 1; i--) {
+    var id = String(data[i][1] || '').trim();
+    if (id && activeIds.indexOf(id) === -1) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+  // Renumber No
+  var updatedData = sheet.getDataRange().getValues();
+  for (var r = 1; r < updatedData.length; r++) {
+    sheet.getRange(r + 1, 1).setValue(r);
+  }
+}
+
+/**
  * Format ulang seluruh data di tab 'Riwayat_Stok'
  */
 function syncMovementsToSheet(movements) {
   if (!movements || !Array.isArray(movements)) return;
   var sheet = getOrCreateSheet(SHEET_MOVEMENTS, [
     "No", "No. Dokumen", "Tanggal Transaksi", "Tipe", "Nama Barang", "Jumlah", "Supplier / Tujuan", "Petugas", "Email Petugas", "Peran (Role)", "Waktu Dicatat (WIB)"
-  ], "#2563EB"); // Biru
+  ], "#2563EB");
 
   var lastRow = sheet.getLastRow();
   if (lastRow > 1) {
@@ -179,7 +359,7 @@ function syncSuppliersToSheet(suppliers) {
   if (!suppliers || !Array.isArray(suppliers)) return;
   var sheet = getOrCreateSheet(SHEET_SUPPLIERS, [
     "No", "ID Supplier", "Nama Supplier", "Kontak Person", "No. Telepon / WA", "Status", "Waktu Terdaftar (WIB)"
-  ], "#059669"); // Hijau Emerald
+  ], "#059669");
 
   var lastRow = sheet.getLastRow();
   if (lastRow > 1) {
@@ -215,7 +395,7 @@ function syncUsersToSheet(users) {
   if (!users || !Array.isArray(users)) return;
   var sheet = getOrCreateSheet(SHEET_USERS, [
     "No", "ID", "Nama Pengguna", "Email", "Peran (Role)", "Terakhir Login (WIB)"
-  ], "#4F46E5"); // Indigo
+  ], "#4F46E5");
 
   var lastRow = sheet.getLastRow();
   if (lastRow > 1) {
@@ -243,10 +423,6 @@ function syncUsersToSheet(users) {
 }
 
 /* ==================== FUNGSI UTAMA: RAPIKAN SEMUA DATA ==================== */
-/**
- * Jalankan fungsi ini dari editor Apps Script atau menu Smartek Inventory
- * untuk mengubah database JSON menjadi tab-tab spreadsheet super rapi!
- */
 function RAPAPIKAN_SEMUA_DATA() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sysSheet = getDatabaseSheet();
@@ -260,61 +436,60 @@ function RAPAPIKAN_SEMUA_DATA() {
     }
   }
 
-  // 1. Rapikan Data_Barang
+  // 1. Rapikan Data_Barang jika data mentah masih ada di storage
   var index = rawMap['inv:index'] || [];
   var items = [];
   for (var j = 0; j < index.length; j++) {
     var it = rawMap['inv:item:' + index[j]];
     if (it) items.push(it);
   }
-  // jika inv:index kosong, cari semua inv:item:*
   if (items.length === 0) {
     for (var key in rawMap) {
       if (key.indexOf('inv:item:') === 0) items.push(rawMap[key]);
     }
   }
 
-  var itemSheet = getOrCreateSheet(SHEET_ITEMS, [
-    "No", "ID Barang", "Nama Barang", "Kategori", "Qty Stok", "Satuan", "Min. Ambang", "Harga Satuan (Rp)", "Lokasi / Gudang", "Status Stok", "Terakhir Diperbarui (WIB)"
-  ], "#DC2626");
-  
-  var lastRow = itemSheet.getLastRow();
-  if (lastRow > 1) {
-    itemSheet.getRange(2, 1, lastRow - 1, 11).clearContent();
-  }
+  if (items.length > 0) {
+    var itemSheet = getOrCreateSheet(SHEET_ITEMS, [
+      "No", "ID Barang", "Nama Barang", "Kategori", "Qty Stok", "Satuan", "Min. Ambang", "Harga Satuan (Rp)", "Lokasi / Gudang", "Status Stok", "Terakhir Diperbarui (WIB)"
+    ], "#DC2626");
+    
+    var lastRow = itemSheet.getLastRow();
+    if (lastRow > 1) {
+      itemSheet.getRange(2, 1, lastRow - 1, 11).clearContent();
+    }
 
-  var itemRows = [];
-  for (var x = 0; x < items.length; x++) {
-    var item = items[x];
-    var qty = Number(item.qty) || 0;
-    var min = Number(item.min) || 0;
-    var status = qty <= 0 ? "HABIS" : (qty <= min ? "RENDAH" : "AMAN");
-    var timeStr = item.createdAt ? Utilities.formatDate(new Date(item.createdAt), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss") : '-';
-    itemRows.push([
-      x + 1,
-      item.id || '-',
-      item.name || '-',
-      item.category || '-',
-      qty,
-      item.unit || 'pcs',
-      min,
-      Number(item.price) || 0,
-      item.desc || '-',
-      status,
-      timeStr
-    ]);
+    var itemRows = [];
+    for (var x = 0; x < items.length; x++) {
+      var item = items[x];
+      var qty = Number(item.qty) || 0;
+      var min = Number(item.min) || 0;
+      var status = qty <= 0 ? "HABIS" : (qty <= min ? "RENDAH" : "AMAN");
+      var timeStr = item.createdAt ? Utilities.formatDate(new Date(item.createdAt), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss") : '-';
+      itemRows.push([
+        x + 1,
+        item.id || '-',
+        item.name || '-',
+        item.category || '-',
+        qty,
+        item.unit || 'pcs',
+        min,
+        Number(item.price) || 0,
+        item.desc || '-',
+        status,
+        timeStr
+      ]);
+    }
+    if (itemRows.length > 0) {
+      itemSheet.getRange(2, 1, itemRows.length, 11).setValues(itemRows);
+      itemSheet.getRange(2, 1, itemRows.length, 1).setHorizontalAlignment("center");
+      itemSheet.getRange(2, 5, itemRows.length, 1).setHorizontalAlignment("center");
+      itemSheet.getRange(2, 7, itemRows.length, 1).setHorizontalAlignment("center");
+      itemSheet.getRange(2, 8, itemRows.length, 1).setNumberFormat('"Rp"#,##0');
+      itemSheet.getRange(2, 10, itemRows.length, 1).setHorizontalAlignment("center");
+    }
+    for (var c = 1; c <= 11; c++) { itemSheet.autoResizeColumn(c); }
   }
-  if (itemRows.length > 0) {
-    itemSheet.getRange(2, 1, itemRows.length, 11).setValues(itemRows);
-    itemSheet.getRange(2, 1, itemRows.length, 1).setHorizontalAlignment("center");
-    itemSheet.getRange(2, 5, itemRows.length, 1).setHorizontalAlignment("center");
-    itemSheet.getRange(2, 7, itemRows.length, 1).setHorizontalAlignment("center");
-    itemSheet.getRange(2, 8, itemRows.length, 1).setNumberFormat('"Rp"#,##0');
-    itemSheet.getRange(2, 10, itemRows.length, 1).setHorizontalAlignment("center");
-  }
-
-  // Auto lebar kolom
-  for (var c = 1; c <= 11; c++) { itemSheet.autoResizeColumn(c); }
 
   // 2. Rapikan Riwayat_Stok
   if (rawMap['inv:movements']) {
@@ -347,8 +522,8 @@ function RAPAPIKAN_SEMUA_DATA() {
     sysSheet.setTabColor("#64748B");
     ss.setActiveSheet(sysSheet);
     ss.moveActiveSheet(ss.getNumSheets());
-    // Aktifkan tab Data_Barang di depan
-    ss.setActiveSheet(itemSheet);
+    var topItemSheet = ss.getSheetByName(SHEET_ITEMS);
+    if (topItemSheet) ss.setActiveSheet(topItemSheet);
   } catch(e) {}
 
   return "Database berhasil dirapikan ke dalam tab-tab spreadsheet yang rapi!";
@@ -370,13 +545,83 @@ function getSessionSheet() {
 /* ==================== GET HANDLER (API) ==================== */
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
-  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. GET ALL DATA: Gabungkan data dari Tabular Master + Storage
+  if (action === 'getAll') {
+    var result = {};
+    
+    // a. Baca setting & credentials dari sheet sistem
+    var sysSheet = getDatabaseSheet();
+    var sysData = sysSheet.getDataRange().getValues();
+    for (var i = 0; i < sysData.length; i++) {
+      var k = String(sysData[i][0] || '').trim();
+      if (k && k !== 'key' && k !== 'No') {
+        var rawVal = sysData[i][1];
+        try { result[k] = JSON.parse(rawVal); } catch(err) { result[k] = rawVal; }
+      }
+    }
+    
+    // b. Baca master barang langsung dari tab [Data_Barang]
+    var itemRes = getItemsFromSheet(ss);
+    if (itemRes.index.length > 0) {
+      result['inv:index'] = itemRes.index;
+      for (var itemId in itemRes.items) {
+        if (result[itemId] && result[itemId].photo) {
+          itemRes.items[itemId].photo = result[itemId].photo;
+        }
+        result[itemId] = itemRes.items[itemId];
+      }
+    }
+    
+    // c. Baca pergerakan stok dari tab [Riwayat_Stok] jika ada
+    var movs = getMovementsFromSheet(ss);
+    if (movs.length > 0 && (!result['inv:movements'] || result['inv:movements'].length === 0)) {
+      result['inv:movements'] = movs;
+    }
+    
+    // d. Baca supplier dari tab [Data_Supplier] jika ada
+    var sups = getSuppliersFromSheet(ss);
+    if (sups.length > 0 && (!result['inv:suppliers'] || result['inv:suppliers'].length === 0)) {
+      result['inv:suppliers'] = sups;
+    }
+    
+    // e. Baca pengguna dari tab [Pengguna_Sistem] jika ada
+    var usrs = getUsersFromSheet(ss);
+    if (usrs.length > 0 && (!result['inv:settings:users'] || result['inv:settings:users'].length === 0)) {
+      result['inv:settings:users'] = usrs;
+    }
+    
+    return respondJson({ ok: true, data: result });
+  }
+
+  // 2. GET SPECIFIC KEY
   if (action === 'get') {
     var key = e.parameter.key;
+    if (key === 'inv:index') {
+      var itemRes = getItemsFromSheet(ss);
+      return respondJson({ ok: true, value: itemRes.index });
+    }
+    if (key.indexOf('inv:item:') === 0) {
+      var itemRes = getItemsFromSheet(ss);
+      if (itemRes.items[key]) {
+        return respondJson({ ok: true, value: itemRes.items[key] });
+      }
+    }
+    if (key === 'inv:movements') {
+      var movs = getMovementsFromSheet(ss);
+      if (movs.length > 0) return respondJson({ ok: true, value: movs });
+    }
+    if (key === 'inv:suppliers') {
+      var sups = getSuppliersFromSheet(ss);
+      if (sups.length > 0) return respondJson({ ok: true, value: sups });
+    }
+    
+    // Fallback ke system storage
     var sheet = getDatabaseSheet();
     var data = sheet.getDataRange().getValues();
     for (var i = 0; i < data.length; i++) {
-      if (data[i][0] === key) {
+      if (String(data[i][0]) === String(key)) {
         var rawVal = data[i][1];
         var parsed = null;
         try { parsed = JSON.parse(rawVal); } catch(err) { parsed = rawVal; }
@@ -386,24 +631,23 @@ function doGet(e) {
     return respondJson({ ok: true, value: null });
   }
   
-  if (action === 'getAll') {
-    var sheet = getDatabaseSheet();
-    var data = sheet.getDataRange().getValues();
-    var result = {};
-    for (var i = 0; i < data.length; i++) {
-      var k = data[i][0];
-      if (k) {
-        var rawVal = data[i][1];
-        try { result[k] = JSON.parse(rawVal); } catch(err) { result[k] = rawVal; }
-      }
-    }
-    return respondJson({ ok: true, data: result });
-  }
-  
+  // 3. GET META (LATEST UPDATE TIME)
   if (action === 'getMeta') {
     var props = PropertiesService.getScriptProperties();
     var latest = props.getProperty('latestUpdate') || '0';
     return respondJson({ ok: true, latestUpdate: parseInt(latest, 10) });
+  }
+
+  // 4. DEBUG INFO
+  if (action === 'debug') {
+    var allSheets = ss.getSheets().map(function(s){ return s.getName(); });
+    var itemRes = getItemsFromSheet(ss);
+    return respondJson({
+      ok: true,
+      sheets: allSheets,
+      itemCount: itemRes.index.length,
+      sampleItems: itemRes.index.slice(0, 5)
+    });
   }
   
   return respondJson({ ok: true, message: 'Smartek Backend API is active.' });
@@ -421,12 +665,12 @@ function doPost(e) {
       var key = body.key;
       var valueObj = body.value;
       var valueStr = typeof valueObj === 'string' ? valueObj : JSON.stringify(valueObj);
-      var sheet = getDatabaseSheet();
-      var data = sheet.getDataRange().getValues();
+      var sysSheet = getDatabaseSheet();
+      var data = sysSheet.getDataRange().getValues();
       var rowIndex = -1;
       
       for (var i = 0; i < data.length; i++) {
-        if (data[i][0] === key) {
+        if (String(data[i][0]) === String(key)) {
           rowIndex = i + 1;
           break;
         }
@@ -434,10 +678,10 @@ function doPost(e) {
       
       var now = Date.now();
       if (rowIndex > 0) {
-        sheet.getRange(rowIndex, 2).setValue(valueStr);
-        sheet.getRange(rowIndex, 3).setValue(now);
+        sysSheet.getRange(rowIndex, 2).setValue(valueStr);
+        sysSheet.getRange(rowIndex, 3).setValue(now);
       } else {
-        sheet.appendRow([key, valueStr, now]);
+        sysSheet.appendRow([key, valueStr, now]);
       }
       
       PropertiesService.getScriptProperties().setProperty('latestUpdate', now.toString());
@@ -447,6 +691,9 @@ function doPost(e) {
         if (key.indexOf('inv:item:') === 0) {
           var itemData = (typeof valueObj === 'string') ? JSON.parse(valueObj) : valueObj;
           syncItemToSheet(itemData);
+        } else if (key === 'inv:index') {
+          var activeIds = (typeof valueObj === 'string') ? JSON.parse(valueObj) : valueObj;
+          cleanItemsNotInIndex(activeIds);
         } else if (key === 'inv:movements') {
           var movData = (typeof valueObj === 'string') ? JSON.parse(valueObj) : valueObj;
           syncMovementsToSheet(movData);
@@ -457,9 +704,7 @@ function doPost(e) {
           var userData = (typeof valueObj === 'string') ? JSON.parse(valueObj) : valueObj;
           syncUsersToSheet(userData);
         }
-      } catch(syncErr) {
-        // error formatting tidak membatalkan penyimpanan utama
-      }
+      } catch(syncErr) {}
 
       return respondJson({ ok: true, updatedAt: now });
     }
