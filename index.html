@@ -240,6 +240,12 @@
         <div class="subtitle" id="pageSubtitle">Pantau dan kelola inventori dengan mudah</div>
       </div>
       <div class="topbar-right">
+        <!-- Status Sinkronisasi Cloud -->
+        <div class="sync-badge" id="syncBadge" title="Status sinkronisasi data dengan Google Sheets" style="display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--ink-soft); background:#F1F5F9; padding:5px 11px; border-radius:20px; font-weight:500;">
+          <span class="sync-dot" id="syncDot" style="width:7px; height:7px; border-radius:50%; background:#10B981; transition:background 0.3s ease;"></span>
+          <span id="syncText">Tersinkron ke cloud</span>
+        </div>
+
         <div class="notif-wrap" id="notifWrap">
           <button class="icon-btn" id="notifBtn" aria-label="Notifikasi">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>

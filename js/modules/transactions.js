@@ -64,47 +64,42 @@ document.getElementById('movSave').addEventListener('click', async ()=>{
   if(!qty || qty<=0){ smartekToast('Jumlah harus lebih dari 0'); return; }
   if(movType==='out' && (Number(item.qty)||0) < qty){ smartekToast(`Stok tidak cukup. Stok tersedia: ${item.qty}`); return; }
 
-  btn.dataset.busy = '1';
-  btn.disabled = true;
-  const originalLabel = btn.textContent;
-  btn.textContent = 'Menyimpan...';
-  try{
-    const isNewItem = !DB.itemIds.includes(item.id);
-    item.qty = movType==='in' ? (Number(item.qty)||0)+qty : (Number(item.qty)||0)-qty;
-    await saveItem(item);
-    DB.items[item.id] = item;
-    if(isNewItem){
-      DB.itemIds.unshift(item.id);
-      await saveIndex();
-    }
-
-    const seq = DB.movements.length + 1;
-    const docNoInput = document.getElementById('movDoc').value.trim();
-    const movement = {
-      id: uid(),
-      docNo: docNoInput || `${movType==='in'?'SI':'SO'}-${todayStr().replace(/-/g,'')}-${String(seq).padStart(3,'0')}`,
-      type: movType,
-      itemId: item.id,
-      itemName: item.name,
-      qty,
-      party: document.getElementById('movParty').value.trim(),
-      date: document.getElementById('movDate').value || todayStr(),
-      createdAt: Date.now()
-    };
-    DB.movements.unshift(movement);
-    await saveMovements();
-
-    movOverlay.classList.remove('open');
-    smartekToast('Stok tersimpan');
-    renderMovements(movType);
-    refreshAlertBadge();
-  }catch(e){
-    smartekToast('Gagal menyimpan');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    btn.dataset.busy = '0';
+  // 1. Perbarui stok & catatan transaksi di memori & local cache instan (0ms)
+  const isNewItem = !DB.itemIds.includes(item.id);
+  item.qty = movType==='in' ? (Number(item.qty)||0)+qty : (Number(item.qty)||0)-qty;
+  DB.items[item.id] = item;
+  if(isNewItem){
+    DB.itemIds.unshift(item.id);
   }
+  localCacheSet('inv:item:' + item.id, item);
+  if(isNewItem) localCacheSet('inv:index', DB.itemIds);
+
+  const seq = DB.movements.length + 1;
+  const docNoInput = document.getElementById('movDoc').value.trim();
+  const movement = {
+    id: uid(),
+    docNo: docNoInput || `${movType==='in'?'SI':'SO'}-${todayStr().replace(/-/g,'')}-${String(seq).padStart(3,'0')}`,
+    type: movType,
+    itemId: item.id,
+    itemName: item.name,
+    qty,
+    party: document.getElementById('movParty').value.trim(),
+    date: document.getElementById('movDate').value || todayStr(),
+    createdAt: Date.now()
+  };
+  DB.movements.unshift(movement);
+  localCacheSet('inv:movements', DB.movements);
+
+  // 2. Tutup modal & perbarui tampilan langsung
+  movOverlay.classList.remove('open');
+  smartekToast(movType==='in' ? 'Stok masuk berhasil dicatat!' : 'Stok keluar berhasil dicatat!');
+  renderMovements(movType);
+  refreshAlertBadge();
+
+  // 3. Sinkronkan ke cloud Google Sheets di balik layar
+  saveItem(item).catch(()=>{});
+  if(isNewItem) saveIndex().catch(()=>{});
+  saveMovements().catch(()=>{});
 });
 
 /* hapus catatan stok masuk/keluar — otomatis kembalikan qty barang */
@@ -116,7 +111,7 @@ window.openMovDeleteConfirm = function(id){
 };
 document.getElementById('movConfirmCancel').addEventListener('click', ()=>{ movConfirmOverlay.classList.remove('open'); movDeletingId = null; });
 // Modal konfirmasi hapus juga hanya ditutup lewat tombol, bukan klik backdrop.
-document.getElementById('movConfirmYes').addEventListener('click', async ()=>{
+document.getElementById('movConfirmYes').addEventListener('click', ()=>{
   movConfirmOverlay.classList.remove('open');
   if(!movDeletingId) return;
   const m = DB.movements.find(x=>x.id===movDeletingId);
@@ -124,15 +119,17 @@ document.getElementById('movConfirmYes').addEventListener('click', async ()=>{
 
   const item = DB.items[m.itemId];
   if(item){
-    // balikkan efek transaksi: stok masuk -> kurangi lagi, stok keluar -> tambahkan lagi
+    // Balikkan efek transaksi: stok masuk -> kurangi lagi, stok keluar -> tambahkan lagi
     item.qty = m.type==='in' ? (Number(item.qty)||0) - m.qty : (Number(item.qty)||0) + m.qty;
     if(item.qty < 0) item.qty = 0;
-    await saveItem(item);
     DB.items[item.id] = item;
+    localCacheSet('inv:item:' + item.id, item);
+    saveItem(item).catch(()=>{});
   }
 
   DB.movements = DB.movements.filter(x=>x.id!==movDeletingId);
-  await saveMovements();
+  localCacheSet('inv:movements', DB.movements);
+  saveMovements().catch(()=>{});
   movDeletingId = null;
 
   renderMovements(m.type);

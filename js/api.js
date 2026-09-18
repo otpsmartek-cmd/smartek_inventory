@@ -29,8 +29,29 @@ async function storeGetAll(){
   }
 }
 
+let pendingSyncCount = 0;
+
+function updateSyncBadge(status, text){
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  if(!dot || !txt) return;
+  if(status === 'syncing'){
+    dot.style.background = '#F59E0B'; // Amber
+    txt.textContent = text || 'Sinkronisasi cloud...';
+  } else if(status === 'synced'){
+    dot.style.background = '#10B981'; // Green
+    txt.textContent = text || 'Tersinkron ke cloud';
+  } else if(status === 'offline'){
+    dot.style.background = '#94A3B8'; // Slate
+    txt.textContent = text || 'Tersimpan di perangkat';
+  }
+}
+
 async function storeSet(key, val){
   localCacheSet(key, val);
+  pendingSyncCount++;
+  updateSyncBadge('syncing');
+
   try{
     const res = await fetch(GAS_URL, {
       method: 'POST',
@@ -38,13 +59,19 @@ async function storeSet(key, val){
       body: JSON.stringify({ action: 'set', key: key, value: val })
     });
     const json = await res.json();
+    pendingSyncCount = Math.max(0, pendingSyncCount - 1);
+
     if(json && json.ok){
       if(json.updatedAt) lastKnownUpdate = json.updatedAt;
+      if(pendingSyncCount === 0) updateSyncBadge('synced');
       return true;
     }
+    if(pendingSyncCount === 0) updateSyncBadge('offline');
     return false;
   }catch(e){
-    console.error('storeSet gagal:', key, e);
+    console.error('storeSet background sync gagal:', key, e);
+    pendingSyncCount = Math.max(0, pendingSyncCount - 1);
+    if(pendingSyncCount === 0) updateSyncBadge('offline');
     return false;
   }
 }

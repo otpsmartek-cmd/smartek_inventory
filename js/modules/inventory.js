@@ -141,9 +141,7 @@ document.getElementById('itemCancel').addEventListener('click', closeItemModal);
 // Sengaja tidak ditutup saat klik area luar (backdrop), supaya isian form tidak
 // hilang tanpa sengaja. Modal hanya bisa ditutup lewat tombol "×" atau "Batal".
 
-document.getElementById('itemSave').addEventListener('click', async ()=>{
-  const btn = document.getElementById('itemSave');
-  if(btn.dataset.busy === '1') return; // cegah klik ganda saat masih menyimpan
+document.getElementById('itemSave').addEventListener('click', ()=>{
   const name = document.getElementById('fName').value.trim();
   const category = document.getElementById('fCat').value.trim();
   const qtyVal = document.getElementById('fQty').value;
@@ -155,37 +153,39 @@ document.getElementById('itemSave').addEventListener('click', async ()=>{
   if(minVal !== '' && Number(minVal) < 0){ smartekToast('Ambang stok rendah tidak boleh negatif'); return; }
   if(priceVal !== '' && Number(priceVal) < 0){ smartekToast('Harga tidak boleh negatif'); return; }
 
-  btn.dataset.busy = '1';
-  btn.disabled = true;
-  const originalLabel = btn.textContent;
-  btn.textContent = 'Menyimpan...';
-  try{
-    const existing = itemEditingId ? DB.items[itemEditingId] : null;
-    const item = {
-      id: itemEditingId || uid(),
-      name,
-      category,
-      unit: document.getElementById('fUnit').value.trim() || 'pcs',
-      qty: Number(qtyVal)||0,
-      min: Number(minVal)||0,
-      price: Number(priceVal)||0,
-      desc: document.getElementById('fDesc').value.trim(),
-      photo: itemPhotoRemoved ? null : (itemPendingPhoto || (existing ? existing.photo : null)),
-      createdAt: existing ? existing.createdAt : Date.now()
-    };
-    await saveItem(item);
-    DB.items[item.id] = item;
-    if(!itemEditingId){ DB.itemIds.unshift(item.id); await saveIndex(); }
-    closeItemModal();
-    renderItems();
-    refreshAlertBadge();
-    smartekToast('Item tersimpan');
-  }catch(e){
-    smartekToast('Gagal menyimpan');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    btn.dataset.busy = '0';
+  const existing = itemEditingId ? DB.items[itemEditingId] : null;
+  const isNew = !itemEditingId;
+  const item = {
+    id: itemEditingId || uid(),
+    name,
+    category,
+    unit: document.getElementById('fUnit').value.trim() || 'pcs',
+    qty: Number(qtyVal)||0,
+    min: Number(minVal)||0,
+    price: Number(priceVal)||0,
+    desc: document.getElementById('fDesc').value.trim(),
+    photo: itemPhotoRemoved ? null : (itemPendingPhoto || (existing ? existing.photo : null)),
+    createdAt: existing ? existing.createdAt : Date.now()
+  };
+
+  // 1. Simpan segera di memori & local cache (Instan 0ms)
+  DB.items[item.id] = item;
+  if(isNew){
+    DB.itemIds.unshift(item.id);
+  }
+  localCacheSet('inv:item:' + item.id, item);
+  localCacheSet('inv:index', DB.itemIds);
+
+  // 2. Tutup modal & perbarui UI langsung tanpa jeda
+  closeItemModal();
+  renderItems();
+  refreshAlertBadge();
+  smartekToast(isNew ? 'Item berhasil ditambahkan!' : 'Item berhasil diperbarui!');
+
+  // 3. Sinkronkan ke cloud Google Sheets di balik layar
+  saveItem(item).catch(()=>{});
+  if(isNew){
+    saveIndex().catch(()=>{});
   }
 });
 
@@ -193,17 +193,24 @@ const itemConfirmOverlay = document.getElementById('itemConfirmOverlay');
 document.getElementById('itemDeleteBtn').addEventListener('click', ()=>{ if(itemEditingId) itemConfirmOverlay.classList.add('open'); });
 document.getElementById('itemConfirmCancel').addEventListener('click', ()=>itemConfirmOverlay.classList.remove('open'));
 // Modal konfirmasi hapus juga hanya ditutup lewat tombol, bukan klik backdrop.
-document.getElementById('itemConfirmYes').addEventListener('click', async ()=>{
+document.getElementById('itemConfirmYes').addEventListener('click', ()=>{
   itemConfirmOverlay.classList.remove('open');
   if(!itemEditingId) return;
   const id = itemEditingId;
+
+  // 1. Hapus segera dari memori & local cache
   delete DB.items[id];
   DB.itemIds = DB.itemIds.filter(x=>x!==id);
-  await saveIndex();
+  localCacheSet('inv:index', DB.itemIds);
+
+  // 2. Refresh tampilan langsung
   closeItemModal();
   renderItems();
   refreshAlertBadge();
-  smartekToast('Item dihapus');
+  smartekToast('Item berhasil dihapus');
+
+  // 3. Sinkronkan di balik layar
+  saveIndex().catch(()=>{});
 });
 document.getElementById('itemSearch').addEventListener('input', ()=>{ itemsPage=1; renderItems(); });
 document.getElementById('itemFilterCat').addEventListener('change', ()=>{ itemsPage=1; renderItems(); });

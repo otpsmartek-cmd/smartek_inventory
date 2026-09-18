@@ -36,47 +36,39 @@ window.openSupplierEdit = function(id){
 document.getElementById('supClose').addEventListener('click', closeSupModal);
 document.getElementById('supCancel').addEventListener('click', closeSupModal);
 // Sengaja tidak ditutup saat klik backdrop, supaya isian form Supplier tidak hilang.
-document.getElementById('supSave').addEventListener('click', async ()=>{
-  const btn = document.getElementById('supSave');
-  if(btn.dataset.busy === '1') return; // cegah klik ganda saat masih menyimpan
+document.getElementById('supSave').addEventListener('click', ()=>{
   const name = document.getElementById('supName').value.trim();
   if(!name){ smartekToast('Nama supplier wajib diisi'); return; }
 
-  btn.dataset.busy = '1';
-  btn.disabled = true;
-  const originalLabel = btn.textContent;
-  btn.textContent = 'Menyimpan...';
-  try{
-    const payload = { name, contact:document.getElementById('supContact').value.trim(), phone:document.getElementById('supPhone').value.trim(), status:document.getElementById('supStatus').value };
-    if(supEditingId){
-      const idx = DB.suppliers.findIndex(x=>x.id===supEditingId);
-      DB.suppliers[idx] = { ...DB.suppliers[idx], ...payload };
-    } else {
-      DB.suppliers.unshift({ id: uid(), ...payload, createdAt: Date.now() });
-    }
-    await saveSuppliers();
-    closeSupModal();
-    renderSuppliers();
-    smartekToast('Supplier tersimpan');
-  }catch(e){
-    smartekToast('Gagal menyimpan');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    btn.dataset.busy = '0';
+  const payload = { name, contact:document.getElementById('supContact').value.trim(), phone:document.getElementById('supPhone').value.trim(), status:document.getElementById('supStatus').value };
+  if(supEditingId){
+    const idx = DB.suppliers.findIndex(x=>x.id===supEditingId);
+    DB.suppliers[idx] = { ...DB.suppliers[idx], ...payload };
+  } else {
+    DB.suppliers.unshift({ id: uid(), ...payload, createdAt: Date.now() });
   }
+
+  // 1. Simpan lokal & refresh UI instan
+  localCacheSet('inv:suppliers', DB.suppliers);
+  closeSupModal();
+  renderSuppliers();
+  smartekToast('Supplier tersimpan');
+
+  // 2. Background sync
+  saveSuppliers().catch(()=>{});
 });
 const supConfirmOverlay = document.getElementById('supConfirmOverlay');
 document.getElementById('supDeleteBtn').addEventListener('click', ()=>{ if(supEditingId) supConfirmOverlay.classList.add('open'); });
 document.getElementById('supConfirmCancel').addEventListener('click', ()=>supConfirmOverlay.classList.remove('open'));
 // Modal konfirmasi hapus juga hanya ditutup lewat tombol, bukan klik backdrop.
-document.getElementById('supConfirmYes').addEventListener('click', async ()=>{
+document.getElementById('supConfirmYes').addEventListener('click', ()=>{
   supConfirmOverlay.classList.remove('open');
   DB.suppliers = DB.suppliers.filter(x=>x.id!==supEditingId);
-  await saveSuppliers();
+  localCacheSet('inv:suppliers', DB.suppliers);
   closeSupModal();
   renderSuppliers();
   smartekToast('Supplier dihapus');
+  saveSuppliers().catch(()=>{});
 });
 
 /* ============ PURCHASE ORDERS ============ */
@@ -100,9 +92,15 @@ function renderPOs(){
         <td style="white-space:nowrap;color:var(--muted,#6b7280);font-size:12px;">${fmtDT(p.createdAt)}</td>
       </tr>`).join('');
 }
-window.updatePOStatus = async function(id, status){
+window.updatePOStatus = function(id, status){
   const idx = DB.purchaseOrders.findIndex(p=>p.id===id);
-  if(idx>=0){ DB.purchaseOrders[idx].status = status; await savePOs(); smartekToast('Status PO diperbarui'); renderPOs(); }
+  if(idx>=0){
+    DB.purchaseOrders[idx].status = status;
+    localCacheSet('inv:pos', DB.purchaseOrders);
+    smartekToast('Status PO diperbarui');
+    renderPOs();
+    savePOs().catch(()=>{});
+  }
 };
 document.getElementById('poSearch').addEventListener('input', renderPOs);
 document.getElementById('btnAddPO').addEventListener('click', ()=>{
@@ -117,39 +115,27 @@ document.getElementById('btnAddPO').addEventListener('click', ()=>{
 document.getElementById('poClose').addEventListener('click', ()=>poOverlay.classList.remove('open'));
 document.getElementById('poCancel').addEventListener('click', ()=>poOverlay.classList.remove('open'));
 // Sengaja tidak ditutup saat klik backdrop, supaya isian form Purchase Order tidak hilang.
-document.getElementById('poSave').addEventListener('click', async ()=>{
-  const btn = document.getElementById('poSave');
-  if(btn.dataset.busy === '1') return; // cegah klik ganda saat masih menyimpan
+document.getElementById('poSave').addEventListener('click', ()=>{
   const supplierName = document.getElementById('poSupplier').value.trim();
   if(!supplierName){ smartekToast('Supplier wajib diisi'); return; }
 
-  btn.dataset.busy = '1';
-  btn.disabled = true;
-  const originalLabel = btn.textContent;
-  btn.textContent = 'Menyimpan...';
-  try{
-    const seq = DB.purchaseOrders.length + 1;
-    const poNumberInput = document.getElementById('poNumber').value.trim();
-    const po = {
-      id: uid(),
-      poNumber: poNumberInput || `PO-${todayStr().replace(/-/g,'')}-${String(seq).padStart(3,'0')}`,
-      supplierName,
-      date: document.getElementById('poDate').value || todayStr(),
-      totalItem: Number(document.getElementById('poTotalItem').value)||0,
-      totalValue: Number(document.getElementById('poTotalValue').value)||0,
-      status: document.getElementById('poStatus').value,
-      createdAt: Date.now()
-    };
-    DB.purchaseOrders.unshift(po);
-    await savePOs();
-    poOverlay.classList.remove('open');
-    smartekToast('Purchase order tersimpan');
-    renderPOs();
-  }catch(e){
-    smartekToast('Gagal menyimpan');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    btn.dataset.busy = '0';
-  }
+  const seq = DB.purchaseOrders.length + 1;
+  const poNumberInput = document.getElementById('poNumber').value.trim();
+  const po = {
+    id: uid(),
+    poNumber: poNumberInput || `PO-${todayStr().replace(/-/g,'')}-${String(seq).padStart(3,'0')}`,
+    supplierName,
+    date: document.getElementById('poDate').value || todayStr(),
+    totalItem: Number(document.getElementById('poTotalItem').value)||0,
+    totalValue: Number(document.getElementById('poTotalValue').value)||0,
+    status: document.getElementById('poStatus').value,
+    createdAt: Date.now()
+  };
+  DB.purchaseOrders.unshift(po);
+  localCacheSet('inv:pos', DB.purchaseOrders);
+  poOverlay.classList.remove('open');
+  smartekToast('Purchase order tersimpan');
+  renderPOs();
+
+  savePOs().catch(()=>{});
 });

@@ -140,31 +140,26 @@ function renderWarehouses(){
 }
 window.openWarehouseModal = function(){ renderWarehouses(); document.getElementById('warehouseOverlay').classList.add('open'); };
 window.closeWarehouseModal = function(){ document.getElementById('warehouseOverlay').classList.remove('open'); };
-window.addWarehouse = async function(){
-  const btn = document.getElementById('addWarehouseBtn');
-  if(btn.dataset.busy === '1') return;
+window.addWarehouse = function(){
   const name = document.getElementById('whName').value.trim();
   const address = document.getElementById('whAddress').value.trim();
   if(!name){ smartekToast('Nama gudang wajib diisi'); return; }
 
-  btn.dataset.busy = '1'; btn.disabled = true;
-  const originalLabel = btn.textContent; btn.textContent = 'Menyimpan...';
-  try{
-    DB.warehouses.unshift({ id: uid(), name, address });
-    await storeSet('inv:settings:warehouses', DB.warehouses);
-    document.getElementById('whName').value='';
-    document.getElementById('whAddress').value='';
-    renderWarehouses();
-    smartekToast('Gudang ditambahkan');
-  } finally {
-    btn.disabled = false; btn.textContent = originalLabel; btn.dataset.busy = '0';
-  }
+  DB.warehouses.unshift({ id: uid(), name, address });
+  localCacheSet('inv:settings:warehouses', DB.warehouses);
+  document.getElementById('whName').value='';
+  document.getElementById('whAddress').value='';
+  renderWarehouses();
+  smartekToast('Gudang ditambahkan');
+
+  storeSet('inv:settings:warehouses', DB.warehouses).catch(()=>{});
 };
-window.deleteWarehouse = async function(id){
+window.deleteWarehouse = function(id){
   DB.warehouses = DB.warehouses.filter(w=>w.id!==id);
-  await storeSet('inv:settings:warehouses', DB.warehouses);
+  localCacheSet('inv:settings:warehouses', DB.warehouses);
   renderWarehouses();
   smartekToast('Gudang dihapus');
+  storeSet('inv:settings:warehouses', DB.warehouses).catch(()=>{});
 };
 
 /* ============ SETTINGS: Satuan ============ */
@@ -176,28 +171,22 @@ function renderUnits(){
 }
 window.openUnitsModal = function(){ renderUnits(); document.getElementById('unitsOverlay').classList.add('open'); };
 window.closeUnitsModal = function(){ document.getElementById('unitsOverlay').classList.remove('open'); };
-window.addUnit = async function(){
-  const btn = document.getElementById('addUnitBtn');
-  if(btn.dataset.busy === '1') return;
+window.addUnit = function(){
   const val = document.getElementById('unitInput').value.trim();
   if(!val){ return; }
   if(DB.units.includes(val)){ smartekToast('Satuan sudah ada'); return; }
 
-  btn.dataset.busy = '1'; btn.disabled = true;
-  const originalLabel = btn.textContent; btn.textContent = 'Menyimpan...';
-  try{
-    DB.units.push(val);
-    await storeSet('inv:settings:units', DB.units);
-    document.getElementById('unitInput').value='';
-    renderUnits();
-  } finally {
-    btn.disabled = false; btn.textContent = originalLabel; btn.dataset.busy = '0';
-  }
-};
-window.deleteUnit = async function(val){
-  DB.units = DB.units.filter(u=>u!==val);
-  await storeSet('inv:settings:units', DB.units);
+  DB.units.push(val);
+  localCacheSet('inv:settings:units', DB.units);
+  document.getElementById('unitInput').value='';
   renderUnits();
+  storeSet('inv:settings:units', DB.units).catch(()=>{});
+};
+window.deleteUnit = function(val){
+  DB.units = DB.units.filter(u=>u!==val);
+  localCacheSet('inv:settings:units', DB.units);
+  renderUnits();
+  storeSet('inv:settings:units', DB.units).catch(()=>{});
 };
 
 /* ============ SETTINGS: Notifikasi ============ */
