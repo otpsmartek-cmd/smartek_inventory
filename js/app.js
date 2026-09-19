@@ -58,7 +58,10 @@ function setupLandingCopyGuard(){
       if(allData['inv:settings:units']) DB.units = allData['inv:settings:units'];
       if(allData['inv:settings:notif']) DB.notifSettings = allData['inv:settings:notif'];
       if(allData['inv:settings:profile']) DB.profile = allData['inv:settings:profile'];
-      if(allData['inv:auth:credentials']) DB.credentials = allData['inv:auth:credentials'];
+      if(allData['inv:auth:credentials']){
+        DB.credentials = allData['inv:auth:credentials'];
+        localCacheSet('inv:auth:credentials', DB.credentials);
+      }
 
       // Sinkronisasi otomatis (auto-heal) antara DB.users dan DB.credentials
       if(Array.isArray(DB.users) && DB.credentials){

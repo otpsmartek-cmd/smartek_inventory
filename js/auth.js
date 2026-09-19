@@ -63,24 +63,30 @@ function findAccount(email){
   if(!key) return null;
 
   // 1. Cek di DB.credentials
-  if(DB.credentials && DB.credentials[key]){
-    const c = DB.credentials[key];
-    return {
-      email: key,
-      name: c.name || deriveNameFromEmail(key),
-      password: c.password,
-      role: c.role || 'Administrator'
-    };
+  if(DB.credentials && typeof DB.credentials === 'object'){
+    let c = DB.credentials[key];
+    if(!c){
+      const matchK = Object.keys(DB.credentials).find(k => k.toLowerCase().trim() === key);
+      if(matchK) c = DB.credentials[matchK];
+    }
+    if(c && c.password !== undefined && c.password !== null){
+      return {
+        email: key,
+        name: c.name || deriveNameFromEmail(key),
+        password: String(c.password),
+        role: c.role || 'Administrator'
+      };
+    }
   }
 
   // 2. Cek di DB.users (misal akun yang dibuat di Settings > Pengguna atau akun bawaan)
   if(DB.users && Array.isArray(DB.users)){
     const u = DB.users.find(x => (x.email || '').toLowerCase().trim() === key);
-    if(u){
+    if(u && u.password !== undefined && u.password !== null){
       const acc = {
         email: key,
         name: u.name || deriveNameFromEmail(key),
-        password: u.password,
+        password: String(u.password),
         role: u.role || 'Administrator'
       };
       // Auto-heal DB.credentials agar lookup selanjutnya instan
@@ -111,13 +117,47 @@ async function attemptAuth(email, password, emailErrId, passwordErrId, intendedR
   }
   if(!ok) return { ok: false };
 
-  const acc = findAccount(email);
+  let acc = findAccount(email);
   if(!acc){
-    showFieldError(emailErrId, 'Akun dengan email ini belum terdaftar. Silakan pilih tab "Daftar Akun" di atas untuk membuat akun baru.');
+    // Jika belum ditemukan di memori lokal, ambil credentials & users langsung dari cloud/Google Sheets
+    try {
+      const remoteCreds = await storeGet('inv:auth:credentials');
+      if(remoteCreds && typeof remoteCreds === 'object'){
+        DB.credentials = Object.assign({}, DB.credentials || {}, remoteCreds);
+        localCacheSet('inv:auth:credentials', DB.credentials);
+        acc = findAccount(email);
+      }
+      if(!acc){
+        const remoteUsers = await storeGet('inv:settings:users');
+        if(Array.isArray(remoteUsers)){
+          DB.users = remoteUsers;
+          localCacheSet('inv:settings:users', DB.users);
+          acc = findAccount(email);
+        }
+      }
+    } catch(e) {
+      console.warn('Gagal sinkron akun dari cloud:', e);
+    }
+  }
+
+  if(!acc){
+    showFieldError(emailErrId, 'Akun dengan email ini belum terdaftar. Silakan hubungi Administrator untuk pembuatan akun.');
     return { ok: false };
   }
 
-  if(acc.password !== password){
+  if(String(acc.password).trim() !== String(password).trim()){
+    // Re-check ke cloud sekali lagi jika password berbeda (misal baru diubah di perangkat lain/oleh Admin)
+    try {
+      const remoteCreds = await storeGet('inv:auth:credentials');
+      if(remoteCreds && typeof remoteCreds === 'object'){
+        DB.credentials = Object.assign({}, DB.credentials || {}, remoteCreds);
+        localCacheSet('inv:auth:credentials', DB.credentials);
+        acc = findAccount(email);
+      }
+    } catch(e){}
+  }
+
+  if(!acc || String(acc.password).trim() !== String(password).trim()){
     showFieldError(passwordErrId, 'Password tidak sesuai. Silakan periksa kembali atau klik "Lupa password?".');
     return { ok: false };
   }
@@ -269,7 +309,17 @@ window.confirmResetPassword = async function(){
     return;
   }
   const key = email.toLowerCase();
-  const acc = findAccount(key);
+  let acc = findAccount(key);
+  if(!acc){
+    try {
+      const remoteCreds = await storeGet('inv:auth:credentials');
+      if(remoteCreds && typeof remoteCreds === 'object'){
+        DB.credentials = Object.assign({}, DB.credentials || {}, remoteCreds);
+        localCacheSet('inv:auth:credentials', DB.credentials);
+        acc = findAccount(key);
+      }
+    } catch(e){}
+  }
   if(!acc){
     showFieldError('resetEmailErr', 'Email ini belum terdaftar di sistem.');
     return;

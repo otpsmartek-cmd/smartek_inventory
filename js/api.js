@@ -97,6 +97,10 @@ async function checkRemoteSync(){
         if(allData){
           await loadAll(allData);
           if(allData['inv:settings:users']){ DB.users = allData['inv:settings:users']; if(isOverlayOpen('usersOverlay')) renderUsers(); }
+          if(allData['inv:auth:credentials']){
+            DB.credentials = allData['inv:auth:credentials'];
+            localCacheSet('inv:auth:credentials', DB.credentials);
+          }
           if(allData['inv:settings:warehouses']){ DB.warehouses = allData['inv:settings:warehouses']; if(isOverlayOpen('warehouseOverlay')) renderWarehouses(); }
           if(allData['inv:settings:units']){ DB.units = allData['inv:settings:units']; if(isOverlayOpen('unitsOverlay')) renderUnits(); }
           const activeKey = document.querySelector('.nav-item.active')?.dataset.page || 'dashboard';
