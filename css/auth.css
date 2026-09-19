@@ -277,3 +277,49 @@
   .showcase-stat span {
     font-size: 10.5px; color: rgba(255, 255, 255, 0.75); text-transform: uppercase; letter-spacing: 0.05em;
   }
+
+/* ============ OTP VERIFICATION STYLES ============ */
+.otp-boxes-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.otp-digit {
+  width: 44px;
+  height: 52px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  font-family: 'Inter', -apple-system, sans-serif;
+  color: var(--ink);
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: #F8FAFC;
+  outline: none;
+  transition: all 0.2s ease;
+  caret-color: var(--red);
+  box-sizing: border-box;
+}
+.otp-digit:focus {
+  border-color: var(--red);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3.5px rgba(196, 30, 42, 0.16);
+  transform: translateY(-2px);
+}
+.otp-digit.error {
+  border-color: #EF4444;
+  background: #FEF2F2;
+  color: #DC2626;
+  animation: otpShake 0.35s ease;
+}
+@keyframes otpShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+@media (max-width: 420px) {
+  .otp-boxes-wrap { gap: 6px; }
+  .otp-digit { width: 38px; height: 46px; font-size: 19px; border-radius: 8px; }
+}

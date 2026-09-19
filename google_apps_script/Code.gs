@@ -922,6 +922,134 @@ function doPost(e) {
         return respondJson({ ok: true, tempPassword: tempPassword, emailSent: false, warning: mailErr.toString() });
       }
     }
+
+    // 5. KIRIM KODE OTP (Two-Factor Authentication via Email)
+    if (action === 'sendOtp') {
+      var email = (body.email || '').toLowerCase().trim();
+      if (!email) {
+        return respondJson({ ok: false, error: 'Email wajib diisi' });
+      }
+
+      var sysSheet = getDatabaseSheet();
+      var data = sysSheet.getDataRange().getValues();
+      var usersList = [];
+      var credsObj = {};
+      var userFound = null;
+
+      for (var i = 0; i < data.length; i++) {
+        var k = String(data[i][0]);
+        if (k === 'inv:settings:users') {
+          try { usersList = JSON.parse(data[i][1]); } catch(e) {}
+        } else if (k === 'inv:auth:credentials') {
+          try { credsObj = JSON.parse(data[i][1]); } catch(e) {}
+        }
+      }
+
+      if (Array.isArray(usersList)) {
+        for (var u = 0; u < usersList.length; u++) {
+          if ((usersList[u].email || '').toLowerCase().trim() === email) {
+            userFound = usersList[u];
+            break;
+          }
+        }
+      }
+      if (!userFound && credsObj[email]) {
+        userFound = { name: credsObj[email].name || 'Pengguna', email: email, role: credsObj[email].role || 'Administrator' };
+      }
+
+      if (!userFound) {
+        return respondJson({ ok: false, error: 'Email tidak terdaftar di sistem Smartek.' });
+      }
+
+      // Generate 6-digit numeric OTP
+      var otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      var now = Date.now();
+      var expiresAt = now + (5 * 60 * 1000); // 5 Menit
+
+      var otpPayload = JSON.stringify({
+        code: otpCode,
+        expiresAt: expiresAt,
+        attempts: 0
+      });
+
+      PropertiesService.getScriptProperties().setProperty('otp:' + email, otpPayload);
+
+      var otpEmailHtml = '<div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;background:#ffffff;">' +
+        '<div style="background:linear-gradient(135deg,#C41E2A,#991B1B);padding:24px;text-align:center;color:#ffffff;">' +
+          '<h2 style="margin:0;font-size:20px;letter-spacing:0.5px;">SMARTEK INVENTORY &amp; STOCK</h2>' +
+          '<div style="font-size:12px;opacity:0.9;margin-top:4px;">Kode Verifikasi Masuk (One-Time Password)</div>' +
+        '</div>' +
+        '<div style="padding:28px 24px;color:#1E293B;font-size:14px;line-height:1.6;">' +
+          '<p style="margin-top:0;">Halo <b>' + (userFound.name || 'Pengguna') + '</b>,</p>' +
+          '<p>Gunakan kode verifikasi berikut untuk masuk ke akun inventori Smartek Anda (<b>' + email + '</b>):</p>' +
+          '<div style="background:#F8FAFC;border:2px dashed #C41E2A;border-radius:10px;padding:20px 16px;text-align:center;margin:22px 0;">' +
+            '<div style="font-size:12px;color:#64748B;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Kode OTP Anda:</div>' +
+            '<div style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#C41E2A;font-family:Consolas,monospace;">' + otpCode + '</div>' +
+            '<div style="font-size:11.5px;color:#94A3B8;margin-top:8px;">⏳ Berlaku selama <b>5 menit</b></div>' +
+          '</div>' +
+          '<div style="background:#FEF2F2;border-left:4px solid #EF4444;border-radius:4px;padding:12px 14px;font-size:12px;color:#991B1B;line-height:1.5;">' +
+            '<b>Penting:</b> Jangan berikan kode ini kepada siapapun demi keamanan inventori perusahaan Anda.' +
+          '</div>' +
+        '</div>' +
+        '<div style="background:#F1F5F9;padding:14px 24px;text-align:center;font-size:11px;color:#64748B;border-top:1px solid #E2E8F0;">' +
+          '&copy; 2026 PT Smartek Innovation — Enterprise Inventory &amp; Stock System.' +
+        '</div>' +
+      '</div>';
+
+      try {
+        MailApp.sendEmail({
+          to: email,
+          subject: "[SMARTEK] Kode Verifikasi Masuk (OTP): " + otpCode,
+          htmlBody: otpEmailHtml
+        });
+        return respondJson({ ok: true, emailSent: true, expiresInSec: 300 });
+      } catch(mailErr) {
+        return respondJson({ ok: true, emailSent: false, fallbackOtp: otpCode, expiresInSec: 300, warning: mailErr.toString() });
+      }
+    }
+
+    // 6. VERIFIKASI KODE OTP
+    if (action === 'verifyOtp') {
+      var email = (body.email || '').toLowerCase().trim();
+      var code = (body.code || '').toString().trim();
+
+      if (!email || !code) {
+        return respondJson({ ok: false, error: 'Email dan kode OTP wajib diisi' });
+      }
+
+      var rawOtp = PropertiesService.getScriptProperties().getProperty('otp:' + email);
+      if (!rawOtp) {
+        return respondJson({ ok: false, error: 'Kode OTP belum diminta atau sudah kedaluwarsa. Silakan minta kode baru.' });
+      }
+
+      var otpData = {};
+      try { otpData = JSON.parse(rawOtp); } catch(e) {}
+
+      if (!otpData.code) {
+        return respondJson({ ok: false, error: 'Data OTP tidak valid. Silakan minta kode baru.' });
+      }
+
+      if (Date.now() > Number(otpData.expiresAt)) {
+        PropertiesService.getScriptProperties().deleteProperty('otp:' + email);
+        return respondJson({ ok: false, error: 'Kode OTP sudah kedaluwarsa (lebih dari 5 menit). Silakan minta kode baru.' });
+      }
+
+      if (Number(otpData.attempts || 0) >= 5) {
+        PropertiesService.getScriptProperties().deleteProperty('otp:' + email);
+        return respondJson({ ok: false, error: 'Terlalu banyak percobaan salah. Silakan minta kode OTP baru.' });
+      }
+
+      if (String(otpData.code).trim() !== String(code).trim()) {
+        otpData.attempts = (Number(otpData.attempts) || 0) + 1;
+        PropertiesService.getScriptProperties().setProperty('otp:' + email, JSON.stringify(otpData));
+        var sisa = 5 - otpData.attempts;
+        return respondJson({ ok: false, error: 'Kode OTP salah. Sisa kesempatan: ' + sisa + ' kali.' });
+      }
+
+      // Verifikasi BERHASIL: Hapus OTP agar tidak bisa dipakai ulang
+      PropertiesService.getScriptProperties().deleteProperty('otp:' + email);
+      return respondJson({ ok: true, message: 'Verifikasi OTP berhasil.' });
+    }
     
     return respondJson({ ok: false, error: 'Unknown action' });
   } catch(err) {

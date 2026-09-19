@@ -183,6 +183,22 @@ async function attemptAuth(email, password, emailErrId, passwordErrId, intendedR
   return { ok: true, role: acc.role || 'Administrator', name: acc.name, email: acc.email };
 }
 
+/* ============ TWO-FACTOR AUTHENTICATION (OTP) ============ */
+let pendingLoginContext = null;
+let otpResendTimer = null;
+let otpResendCountdown = 60;
+let otpListenersAttached = false;
+
+function maskEmail(email){
+  if(!email) return '';
+  const parts = email.split('@');
+  if(parts.length < 2) return email;
+  const local = parts[0];
+  const domain = parts[1];
+  if(local.length <= 2) return local.charAt(0) + '***@' + domain;
+  return local.charAt(0) + '***' + local.charAt(local.length - 1) + '@' + domain;
+}
+
 window.handleLogin = async function(){
   clearFieldErrors('loginEmailErr','loginPasswordErr');
   const email = document.getElementById('loginEmail').value.trim();
@@ -191,15 +207,251 @@ window.handleLogin = async function(){
   const txt = document.getElementById('loginBtnText');
 
   if(btn){ btn.disabled = true; }
-  if(txt){ txt.textContent = 'Memverifikasi...'; }
+  if(txt){ txt.textContent = 'Memverifikasi akun...'; }
   try{
     const result = await attemptAuth(email, password, 'loginEmailErr', 'loginPasswordErr');
     if(!result.ok) return;
-    enterApp(result.role, email, password.trim(), false, result.name);
+
+    // Kredensial valid! Siapkan konteks login sementara & buka verifikasi OTP
+    pendingLoginContext = {
+      role: result.role,
+      email: result.email || email,
+      password: password.trim(),
+      name: result.name
+    };
+
+    openOtpModal(pendingLoginContext.email);
   } finally {
     if(btn){ btn.disabled = false; }
     if(txt){ txt.textContent = 'Masuk ke Sistem'; }
   }
+};
+
+async function openOtpModal(email){
+  const overlay = document.getElementById('otpModalOverlay');
+  if(!overlay) return;
+
+  const maskedEl = document.getElementById('otpEmailMasked');
+  if(maskedEl) maskedEl.textContent = maskEmail(email);
+
+  clearOtpInputs();
+  const errEl = document.getElementById('otpErr');
+  if(errEl) errEl.textContent = '';
+  const card = document.getElementById('otpFallbackCard');
+  if(card){ card.style.display = 'none'; card.innerHTML = ''; }
+
+  overlay.classList.add('open');
+  initOtpInputEvents();
+
+  setTimeout(() => {
+    const first = document.getElementById('otp1');
+    if(first) first.focus();
+  }, 120);
+
+  await triggerSendOtp(email);
+}
+
+async function triggerSendOtp(email){
+  const card = document.getElementById('otpFallbackCard');
+  const errEl = document.getElementById('otpErr');
+
+  startOtpCountdown();
+
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'sendOtp', email: email.toLowerCase().trim() })
+    });
+    const json = await res.json();
+
+    if(json && json.ok){
+      if(json.emailSent !== false){
+        smartekToast(`Kode OTP telah dikirim ke ${email}. Cek inbox/spam.`, 4000);
+      } else if(json.fallbackOtp && card){
+        card.style.display = 'block';
+        card.innerHTML = `
+          <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:12px;color:#92400E;font-size:11.5px;line-height:1.45;">
+            <div style="font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:5px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Izin Email Belum Aktif di Spreadsheet
+            </div>
+            Layanan email Google Mail belum diaktifkan pemilik spreadsheet. Gunakan kode OTP verifikasi berikut:<br>
+            <div style="text-align:center;font-size:24px;font-weight:bold;letter-spacing:6px;color:#B45309;font-family:monospace;margin:8px 0;background:#fff;padding:8px;border-radius:6px;border:1.5px dashed #F59E0B;">
+              ${esc(json.fallbackOtp)}
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" style="width:100%;font-size:11px;" onclick="fillAndVerifyOtp('${esc(json.fallbackOtp)}')">
+              Isi Otomatis &amp; Masuk
+            </button>
+          </div>
+        `;
+      }
+    } else {
+      if(errEl) errEl.textContent = json.error || 'Gagal mengirim kode OTP.';
+    }
+  } catch(e){
+    console.warn('sendOtp failed:', e);
+    if(errEl) errEl.textContent = 'Koneksi ke server terganggu saat mengirim OTP.';
+  }
+}
+
+function startOtpCountdown(){
+  const resendBtn = document.getElementById('otpResendBtn');
+  const timerTxt = document.getElementById('otpTimerTxt');
+  const span = document.getElementById('otpCountdown');
+
+  if(otpResendTimer) clearInterval(otpResendTimer);
+  otpResendCountdown = 60;
+  if(resendBtn) resendBtn.disabled = true;
+  if(timerTxt) timerTxt.style.display = 'block';
+  if(span) span.textContent = '60';
+
+  otpResendTimer = setInterval(() => {
+    otpResendCountdown--;
+    if(span) span.textContent = otpResendCountdown.toString();
+    if(otpResendCountdown <= 0){
+      clearInterval(otpResendTimer);
+      if(resendBtn) resendBtn.disabled = false;
+      if(timerTxt) timerTxt.style.display = 'none';
+    }
+  }, 1000);
+}
+
+function initOtpInputEvents(){
+  if(otpListenersAttached) return;
+  otpListenersAttached = true;
+
+  const boxes = [1,2,3,4,5,6].map(n => document.getElementById('otp' + n)).filter(Boolean);
+
+  boxes.forEach((input, idx) => {
+    input.addEventListener('input', () => {
+      const val = input.value.replace(/\D/g, '');
+      input.value = val ? val.slice(-1) : '';
+      input.classList.remove('error');
+      const errEl = document.getElementById('otpErr');
+      if(errEl) errEl.textContent = '';
+
+      if(val && idx < boxes.length - 1){
+        boxes[idx + 1].focus();
+      }
+
+      const currentCode = boxes.map(b => b.value.trim()).join('');
+      if(currentCode.length === 6){
+        window.submitOtpVerification();
+      }
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if(e.key === 'Backspace' && !input.value && idx > 0){
+        boxes[idx - 1].focus();
+      } else if(e.key === 'Enter'){
+        e.preventDefault();
+        window.submitOtpVerification();
+      }
+    });
+
+    input.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+      if(!paste) return;
+      paste.split('').forEach((ch, i) => {
+        if(boxes[i]) boxes[i].value = ch;
+      });
+      const nextIdx = Math.min(paste.length, boxes.length - 1);
+      if(boxes[nextIdx]) boxes[nextIdx].focus();
+      if(paste.length === 6){
+        window.submitOtpVerification();
+      }
+    });
+  });
+}
+
+window.submitOtpVerification = async function(){
+  if(!pendingLoginContext) return;
+  const boxes = [1,2,3,4,5,6].map(n => document.getElementById('otp' + n));
+  const code = boxes.map(b => (b ? b.value.trim() : '')).join('');
+  const errEl = document.getElementById('otpErr');
+  const submitBtn = document.getElementById('otpSubmitBtn');
+  const submitTxt = document.getElementById('otpSubmitTxt');
+
+  if(code.length < 6){
+    if(errEl) errEl.textContent = 'Masukkan 6 digit kode OTP yang lengkap';
+    boxes.forEach(b => { if(b && !b.value) b.classList.add('error'); });
+    return;
+  }
+
+  if(submitBtn) submitBtn.disabled = true;
+  if(submitTxt) submitTxt.textContent = 'Memverifikasi...';
+  if(errEl) errEl.textContent = '';
+
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'verifyOtp',
+        email: pendingLoginContext.email.toLowerCase().trim(),
+        code: code
+      })
+    });
+    const json = await res.json();
+
+    if(json && json.ok){
+      closeOtpModal();
+      const ctx = pendingLoginContext;
+      pendingLoginContext = null;
+      enterApp(ctx.role, ctx.email, ctx.password, false, ctx.name);
+      smartekToast(`Verifikasi OTP berhasil! Selamat datang, ${ctx.name}.`, 3500);
+      return;
+    }
+
+    if(errEl) errEl.textContent = json.error || 'Kode OTP salah. Silakan coba lagi.';
+    boxes.forEach(b => { if(b) b.classList.add('error'); });
+  } catch(err){
+    console.error('verifyOtp error:', err);
+    if(errEl) errEl.textContent = 'Gagal memverifikasi OTP. Periksa koneksi internet Anda.';
+  } finally {
+    if(submitBtn) submitBtn.disabled = false;
+    if(submitTxt) submitTxt.textContent = 'Verifikasi & Masuk';
+  }
+};
+
+window.resendOtpCode = async function(){
+  if(!pendingLoginContext) return;
+  const resendBtn = document.getElementById('otpResendBtn');
+  if(resendBtn && resendBtn.disabled) return;
+  clearOtpInputs();
+  const errEl = document.getElementById('otpErr');
+  if(errEl) errEl.textContent = '';
+  await triggerSendOtp(pendingLoginContext.email);
+};
+
+window.cancelOtpVerification = function(){
+  closeOtpModal();
+  pendingLoginContext = null;
+};
+
+function closeOtpModal(){
+  const overlay = document.getElementById('otpModalOverlay');
+  if(overlay) overlay.classList.remove('open');
+  if(otpResendTimer) clearInterval(otpResendTimer);
+  clearOtpInputs();
+}
+
+function clearOtpInputs(){
+  [1,2,3,4,5,6].forEach(n => {
+    const b = document.getElementById('otp' + n);
+    if(b){ b.value = ''; b.classList.remove('error'); }
+  });
+}
+
+window.fillAndVerifyOtp = function(code){
+  if(!code) return;
+  const boxes = [1,2,3,4,5,6].map(n => document.getElementById('otp' + n));
+  String(code).trim().slice(0, 6).split('').forEach((ch, idx) => {
+    if(boxes[idx]) boxes[idx].value = ch;
+  });
+  window.submitOtpVerification();
 };
 
 window.switchAuthTab = function(tab){
