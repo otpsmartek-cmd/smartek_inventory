@@ -1,10 +1,12 @@
 /* ============ util ============ */
 function esc(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function rupiah(n){ return 'Rp' + Number(n||0).toLocaleString('id-ID'); }
-function smartekToast(msg){
+function smartekToast(msg, duration = 3000){
   const el = document.getElementById('toastEl');
+  if(!el) return;
   el.textContent = msg; el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'), 1800);
+  if(el._toastTimer) clearTimeout(el._toastTimer);
+  el._toastTimer = setTimeout(()=>el.classList.remove('show'), duration);
 }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function todayStr(){ return new Date().toISOString().slice(0,10); }

@@ -28,7 +28,41 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("📦 Smartek Inventory")
     .addItem("✨ Rapikan Semua Data ke Tab Baru", "RAPIKAN_SEMUA_DATA")
+    .addItem("📧 Aktifkan Izin Pengiriman Email", "OTORISASI_PENGIRIMAN_EMAIL")
     .addToUi();
+}
+
+/**
+ * Jalankan fungsi ini SEKALI di editor Google Apps Script (klik tombol 'Jalankan' / 'Run')
+ * atau dari menu spreadsheet di atas untuk mengaktifkan izin pengiriman email (OAuth: send_mail)
+ */
+function OTORISASI_PENGIRIMAN_EMAIL() {
+  var ui;
+  try { ui = SpreadsheetApp.getUi(); } catch(e) {}
+  var myEmail = "";
+  try { myEmail = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail(); } catch(e) {}
+  if (!myEmail) myEmail = "admin@smartek.co.id";
+
+  try {
+    MailApp.sendEmail({
+      to: myEmail,
+      subject: "✅ [SMARTEK] Izin Pengiriman Email Berhasil Diaktifkan",
+      htmlBody: "<div style='font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;border:1px solid #E2E8F0;border-radius:8px;'>" +
+        "<h3 style='color:#C41E2A;margin-top:0;'>Sistem Inventori Smartek</h3>" +
+        "<p>Izin pengiriman email otomatis (reset password & notifikasi) telah <b>berhasil diaktifkan</b>!</p>" +
+        "<p style='color:#64748B;font-size:12px;'>Waktu aktivasi: " + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd HH:mm:ss") + " WIB</p>" +
+        "</div>"
+    });
+    if (ui) {
+      ui.alert("Izin Email Aktif!", "Izin pengiriman email telah aktif. Email tes telah dikirim ke: " + myEmail, ui.ButtonSet.OK);
+    }
+    return "BERHASIL: Izin email telah aktif. Email dikirim ke " + myEmail;
+  } catch(err) {
+    if (ui) {
+      ui.alert("Otorisasi Diperlukan", "Silakan ikuti jendela popup otorisasi Google untuk mengizinkan pengiriman email:\n\n" + err.toString(), ui.ButtonSet.OK);
+    }
+    throw err;
+  }
 }
 
 /**

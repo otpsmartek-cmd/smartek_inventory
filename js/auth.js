@@ -295,15 +295,26 @@ window.openForgotPassword = function(){
   const prefill = document.getElementById('loginEmail').value.trim();
   document.getElementById('resetEmail').value = prefill;
   clearFieldErrors('resetEmailErr');
+  const box = document.getElementById('resetResultBox');
+  if(box){ box.style.display = 'none'; box.innerHTML = ''; }
+  const btn = document.getElementById('resetSubmitBtn');
+  if(btn){ btn.style.display = 'inline-flex'; btn.disabled = false; btn.textContent = 'Kirim Password ke Email'; }
   document.getElementById('resetPasswordOverlay').classList.add('open');
 };
 window.closeForgotPassword = function(){
+  const box = document.getElementById('resetResultBox');
+  if(box){ box.style.display = 'none'; box.innerHTML = ''; }
+  const btn = document.getElementById('resetSubmitBtn');
+  if(btn){ btn.style.display = 'inline-flex'; btn.disabled = false; }
   document.getElementById('resetPasswordOverlay').classList.remove('open');
 };
 
 window.confirmResetPassword = async function(){
   clearFieldErrors('resetEmailErr');
   const email = document.getElementById('resetEmail').value.trim();
+  const box = document.getElementById('resetResultBox');
+  if(box){ box.style.display = 'none'; box.innerHTML = ''; }
+
   if(!email || !isValidEmail(email)){
     showFieldError('resetEmailErr', 'Masukkan alamat email yang valid');
     return;
@@ -327,7 +338,7 @@ window.confirmResetPassword = async function(){
 
   const btn = document.getElementById('resetSubmitBtn');
   const origText = btn ? btn.innerHTML : 'Kirim Password ke Email';
-  if(btn){ btn.disabled = true; btn.textContent = 'Mengirim email...'; }
+  if(btn){ btn.disabled = true; btn.textContent = 'Memproses ke Server...'; }
 
   try {
     const res = await fetch(GAS_URL, {
@@ -348,15 +359,49 @@ window.confirmResetPassword = async function(){
         if(u) { u.password = json.tempPassword; localCacheSet('inv:settings:users', DB.users); }
       }
 
-      closeForgotPassword();
       document.getElementById('loginEmail').value = email;
-      document.getElementById('loginPassword').value = '';
       clearFieldErrors('loginEmailErr','loginPasswordErr');
 
-      if(json.emailSent !== false){
-        smartekToast(`Kata sandi baru telah dikirim ke ${email}. Silakan cek kotak masuk/spam Anda.`);
-      } else {
-        smartekToast(`Password sementara akun Anda: ${json.tempPassword}. Silakan gunakan untuk masuk.`);
+      if(box){
+        box.style.display = 'block';
+        if(btn) btn.style.display = 'none';
+
+        if(json.emailSent !== false){
+          box.innerHTML = `
+            <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:14px;color:#065F46;">
+              <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                Kata Sandi Baru Berhasil Dikirim!
+              </div>
+              <div style="font-size:12px;line-height:1.5;">
+                Kata sandi baru telah dikirim ke <b>${esc(email)}</b>.<br>Silakan periksa folder <b>Kotak Masuk</b> atau <b>Spam</b> Anda.
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" style="margin-top:12px;width:100%;" onclick="closeForgotPassword()">
+                Kembali ke Halaman Masuk
+              </button>
+            </div>
+          `;
+          smartekToast(`Kata sandi baru telah dikirim ke ${email}.`, 4000);
+        } else {
+          box.innerHTML = `
+            <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:14px;color:#92400E;">
+              <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Kata Sandi Baru Berhasil Dibuat
+              </div>
+              <div style="font-size:12px;line-height:1.45;margin-bottom:10px;">
+                Izin kirim email Google Apps Script belum diaktifkan pemilik spreadsheet. Berikut kata sandi sementara Anda:
+              </div>
+              <div style="background:#FFFFFF;border:1.5px dashed #F59E0B;border-radius:6px;padding:10px;text-align:center;font-size:20px;font-weight:bold;letter-spacing:3px;color:#B45309;font-family:monospace;margin-bottom:10px;">
+                ${esc(json.tempPassword)}
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" style="width:100%;" onclick="useTempPasswordAndLogin('${esc(json.tempPassword)}')">
+                Gunakan Password Ini &amp; Masuk
+              </button>
+            </div>
+          `;
+          smartekToast(`Password sementara akun Anda: ${json.tempPassword}`, 5000);
+        }
       }
       return;
     }
@@ -378,12 +423,39 @@ window.confirmResetPassword = async function(){
       if(u) { u.password = tempPw; localCacheSet('inv:settings:users', DB.users); }
     }
 
-    closeForgotPassword();
     document.getElementById('loginEmail').value = email;
-    document.getElementById('loginPassword').value = '';
     clearFieldErrors('loginEmailErr','loginPasswordErr');
-    smartekToast(`Password sementara Anda: ${tempPw}. Gunakan untuk masuk.`);
+
+    if(box){
+      box.style.display = 'block';
+      if(btn) btn.style.display = 'none';
+      box.innerHTML = `
+        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:14px;color:#92400E;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px;">Kata Sandi Baru Telah Dibuat</div>
+          <div style="font-size:12px;line-height:1.45;margin-bottom:10px;">Gunakan kata sandi sementara berikut untuk masuk:</div>
+          <div style="background:#FFFFFF;border:1.5px dashed #F59E0B;border-radius:6px;padding:10px;text-align:center;font-size:20px;font-weight:bold;letter-spacing:3px;color:#B45309;font-family:monospace;margin-bottom:10px;">
+            ${tempPw}
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" style="width:100%;" onclick="useTempPasswordAndLogin('${tempPw}')">
+            Gunakan Password Ini &amp; Masuk
+          </button>
+        </div>
+      `;
+    }
+    smartekToast(`Password sementara Anda: ${tempPw}`, 5000);
   } finally {
-    if(btn){ btn.disabled = false; btn.innerHTML = origText; }
+    if(btn && (!box || box.style.display === 'none')){
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
   }
+};
+
+window.useTempPasswordAndLogin = function(tempPw){
+  const email = document.getElementById('resetEmail').value.trim();
+  closeForgotPassword();
+  document.getElementById('loginEmail').value = email;
+  document.getElementById('loginPassword').value = tempPw;
+  clearFieldErrors('loginEmailErr','loginPasswordErr');
+  smartekToast('Password terpasang! Silakan klik Masuk ke Sistem.', 3500);
 };
