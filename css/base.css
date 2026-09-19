@@ -12,8 +12,12 @@
 
   .sidebar{width:220px;flex-shrink:0;background:linear-gradient(180deg,var(--red),var(--red-dark));color:#fff;
     display:flex;flex-direction:column;padding:14px 12px;position:sticky;top:0;height:100vh;overflow-y:auto;}
-  .brand{display:flex;align-items:center;justify-content:center;padding:10px 14px;margin:-14px -12px 12px;background:#fff;border-bottom:1px solid rgba(0,0,0,0.06);}
-  .brand-logo-img{width:auto;max-width:130px;height:38px;object-fit:contain;}
+  .brand{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;margin:-14px -12px 12px;background:#fff;border-bottom:1px solid rgba(0,0,0,0.06);}
+  .brand-lockup{display:flex;align-items:center;gap:9px;min-width:0;}
+  .brand-logo-img{width:32px;height:32px;object-fit:contain;flex-shrink:0;}
+  .brand-info{display:flex;flex-direction:column;line-height:1.15;min-width:0;text-align:left;}
+  .brand-name{font-size:13px;font-weight:800;color:var(--red);letter-spacing:0.02em;white-space:nowrap;}
+  .brand-tagline{font-size:9.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
   nav{display:flex;flex-direction:column;gap:2px;flex:1;}
   .nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;font-size:12.5px;font-weight:500;color:rgba(255,255,255,.88);cursor:pointer;border:none;background:none;text-align:left;width:100%;font-family:inherit;}
   .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:.9;}

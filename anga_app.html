@@ -332,7 +332,13 @@
 <div class="app">
   <aside class="sidebar" id="appSidebar">
     <div class="brand">
-      <img src="assets/logo.png" alt="SMARTEK" class="brand-logo-img">
+      <div class="brand-lockup">
+        <img src="assets/logo.png" alt="SMARTEK" class="brand-logo-img">
+        <div class="brand-info">
+          <div class="brand-name">SMARTEK</div>
+          <div class="brand-tagline">Inventory &amp; Stock</div>
+        </div>
+      </div>
       <button class="sidebar-close-btn" id="btnCloseSidebar" aria-label="Tutup Menu">✕</button>
     </div>
     <nav id="navList"></nav>
@@ -410,21 +416,35 @@
 
         <div class="panels-row">
           <div class="panel">
-            <div class="panel-head"><h3>Ringkasan Stok</h3></div>
-            <div class="donut-wrap">
-              <div class="donut-canvas-box"><div id="donutStok" style="width:100%;height:100%;"></div><div class="donut-center"><div class="n" id="donutTotal">0</div><div class="l">Item</div></div></div>
-              <div class="legend" id="legendStok"></div>
+            <div class="panel-head">
+              <h3>Ringkasan Stok</h3>
+              <span class="pill aman" id="stockHealthBadge" style="font-size:9.5px;padding:2px 8px;">Kondisi Sehat</span>
             </div>
-            <div class="callout"><span>ℹ️</span><span>Pastikan ketersediaan stok selalu optimal untuk mendukung operasional.</span></div>
+            <div class="donut-wrap" style="align-items:flex-start;">
+              <div class="donut-canvas-box">
+                <div id="donutStok" style="width:100%;height:100%;"></div>
+                <div class="donut-center"><div class="n" id="donutTotal">0</div><div class="l">Item</div></div>
+              </div>
+              <div class="legend" id="legendStok" style="flex:1;"></div>
+            </div>
+            <div class="callout" style="margin-top:10px;">
+              <span>ℹ️</span><span id="stockCalloutText">Ketersediaan barang optimal untuk operasional bisnis.</span>
+            </div>
           </div>
           <div class="panel">
-            <div class="panel-head"><h3>Stok Masuk vs Stok Keluar</h3></div>
+            <div class="panel-head">
+              <h3>Stok Masuk vs Stok Keluar</h3>
+              <div class="flow-net-badge" id="flowNetBadge" style="font-size:10px;font-weight:700;color:var(--green);background:var(--green-bg);padding:2px 8px;border-radius:12px;">Net: +0 unit</div>
+            </div>
             <div id="barStok"></div>
             <div class="note" id="barNote"></div>
           </div>
           <div class="panel">
-            <div class="panel-head"><h3>Kategori Teratas</h3></div>
-            <div class="donut-canvas-box" style="margin:0 auto 8px;"><div id="donutKategori" style="width:100%;height:100%;"></div></div>
+            <div class="panel-head">
+              <h3>Kategori Teratas</h3>
+              <span class="count-badge" id="catTotalBadge" style="background:#F1F5F9;color:var(--ink-soft);font-weight:700;font-size:10px;padding:2px 8px;">0 Kategori</span>
+            </div>
+            <div class="donut-canvas-box" style="margin:0 auto 8px;width:80px;height:80px;"><div id="donutKategori" style="width:100%;height:100%;"></div></div>
             <div id="legendKategori"></div>
             <span class="link-more" onclick="goPage('categories')">Lihat Semua Kategori →</span>
           </div>
@@ -616,7 +636,7 @@
       </section>
 
     </div>
-    <footer class="page-footer">© 2026 Smartek Innovation System — versi in-chat.</footer>
+    <footer class="page-footer">© 2026 PT Smartek Innovation — Enterprise Inventory &amp; Stock System.</footer>
   </div>
 </div>
 
