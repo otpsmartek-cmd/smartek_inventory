@@ -1,5 +1,4 @@
 /* ============ SETTINGS: Informasi Perusahaan ============ */
-async function loadCompany(){ DB.company = (await storeGet('inv:settings:company')) || { name:'', address:'', phone:'', email:'' }; }
 window.openCompanyModal = function(){
   document.getElementById('coName').value = DB.company.name || '';
   document.getElementById('coAddress').value = DB.company.address || '';
@@ -21,35 +20,11 @@ window.saveCompany = async function(){
 };
 
 /* ============ SETTINGS: Pengguna ============ */
-async function loadUsers(){ DB.users = (await storeGet('inv:settings:users')) || [ { id: uid(), name:'Admin Smartek', email:'admin@smartek.co.id', role:'Administrator' } ]; }
 function deriveNameFromEmail(email){
   const local = (email || '').split('@')[0] || email;
   const cleaned = local.replace(/[._-]+/g, ' ').trim();
   if(!cleaned) return email;
   return cleaned.split(' ').filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-/* Setiap kali ada yang berhasil login, otomatis catat/perbarui namanya di daftar
-   Settings > Pengguna, lengkap dengan role dan passwordnya (disamarkan di tabel,
-   bisa ditampilkan lewat tombol "Lihat"). */
-async function syncUserFromLogin(email, password, role, displayName = null){
-  const key = (email || '').toLowerCase().trim();
-  if(!key) return;
-  const list = Array.isArray(DB.users) ? [...DB.users] : [];
-  const idx = list.findIndex(u => (u.email || '').toLowerCase().trim() === key);
-  const now = Date.now();
-  const name = displayName || (idx >= 0 && list[idx].name ? list[idx].name : deriveNameFromEmail(email));
-  if(idx >= 0){
-    list[idx] = { ...list[idx], name, role, password: password || list[idx].password, lastLogin: now };
-  } else {
-    list.unshift({ id: uid(), name, email: key, role, password, lastLogin: now });
-  }
-  DB.users = list;
-  localCacheSet('inv:settings:users', list);
-  const overlay = document.getElementById('usersOverlay');
-  if(overlay && overlay.classList.contains('open')) renderUsers();
-
-  // Background sync ke server
-  storeSet('inv:settings:users', list).catch(()=>{});
 }
 function renderUsers(){
   document.getElementById('usersBody').innerHTML = DB.users.length === 0
@@ -132,7 +107,6 @@ window.deleteUser = async function(id){
 };
 
 /* ============ SETTINGS: Gudang ============ */
-async function loadWarehouses(){ DB.warehouses = (await storeGet('inv:settings:warehouses')) || []; }
 function renderWarehouses(){
   document.getElementById('warehouseBody').innerHTML = DB.warehouses.length === 0
     ? `<tr class="empty-row"><td colspan="3">Belum ada gudang tercatat.</td></tr>`
@@ -163,7 +137,6 @@ window.deleteWarehouse = function(id){
 };
 
 /* ============ SETTINGS: Satuan ============ */
-async function loadUnits(){ DB.units = (await storeGet('inv:settings:units')) || ['pcs','box','kg','meter']; }
 function renderUnits(){
   document.getElementById('unitsChips').innerHTML = DB.units.length === 0
     ? `<div class="note">Belum ada satuan.</div>`
@@ -190,7 +163,6 @@ window.deleteUnit = function(val){
 };
 
 /* ============ SETTINGS: Notifikasi ============ */
-async function loadNotifSettings(){ DB.notifSettings = (await storeGet('inv:settings:notif')) || { defaultMin:5, badgeEnabled:true }; }
 window.openNotifSettingsModal = function(){
   document.getElementById('notifDefaultMin').value = DB.notifSettings.defaultMin;
   document.getElementById('notifBadgeEnabled').checked = DB.notifSettings.badgeEnabled;
@@ -268,11 +240,6 @@ document.getElementById('restoreFileInput').addEventListener('change', async (e)
 });
 
 /* ============ PROFILE ============ */
-async function loadProfile(){
-  DB.profile = (await storeGet('inv:settings:profile')) || {
-    name:'Admin Smartek', email:'admin@smartek.co.id', role:'Administrator', joined: todayStr()
-  };
-}
 function formatJoinedDate(val){
   if(!val) return '-';
   try{

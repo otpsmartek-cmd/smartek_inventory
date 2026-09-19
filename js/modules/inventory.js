@@ -13,8 +13,6 @@ function updateItemCatOptions(){
 }
 
 function renderItems(){
-  const btnAdd = document.getElementById('btnAddItem');
-  if(btnAdd) btnAdd.style.display = canWrite() ? 'inline-flex' : 'none';
   updateItemCatOptions();
   const search = document.getElementById('itemSearch').value.trim().toLowerCase();
   const catFilter = document.getElementById('itemFilterCat').value;
@@ -78,10 +76,6 @@ function closeItemModal(){
   document.getElementById('photoLabel').style.display='block';
   document.getElementById('photoRemoveBtn').style.display='none';
   document.getElementById('itemDeleteBtn').style.display='none';
-}
-const btnAddItem = document.getElementById('btnAddItem');
-if(btnAddItem){
-  btnAddItem.addEventListener('click', ()=>{ closeItemModal(); document.getElementById('itemModalTitle').textContent='Tambah Item'; itemOverlay.classList.add('open'); });
 }
 window.openItemEdit = function(id){
   const item = DB.items[id]; if(!item) return;

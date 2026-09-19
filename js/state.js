@@ -86,7 +86,6 @@ async function loadAll(allData = null){
 function itemList(){ return DB.itemIds.map(id => DB.items[id]).filter(Boolean).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 async function saveIndex(){ await storeSet('inv:index', DB.itemIds); }
 async function saveItem(item){ await storeSet('inv:item:' + item.id, item); }
-async function deleteItemStore(id){ /* leave orphan key harmless, just drop from index */ }
 async function saveSuppliers(){ await storeSet('inv:suppliers', DB.suppliers); }
 async function savePOs(){ await storeSet('inv:pos', DB.purchaseOrders); }
 async function saveMovements(){ await storeSet('inv:movements', DB.movements); }

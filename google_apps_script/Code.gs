@@ -27,7 +27,7 @@ var SHEET_SESSION   = "Sesi_Aktif";
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("📦 Smartek Inventory")
-    .addItem("✨ Rapikan Semua Data ke Tab Baru", "RAPAPIKAN_SEMUA_DATA")
+    .addItem("✨ Rapikan Semua Data ke Tab Baru", "RAPIKAN_SEMUA_DATA")
     .addToUi();
 }
 
@@ -428,6 +428,10 @@ function syncUsersToSheet(users) {
 }
 
 /* ==================== FUNGSI UTAMA: RAPIKAN SEMUA DATA ==================== */
+function RAPIKAN_SEMUA_DATA() {
+  return RAPAPIKAN_SEMUA_DATA();
+}
+
 function RAPAPIKAN_SEMUA_DATA() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sysSheet = getDatabaseSheet();

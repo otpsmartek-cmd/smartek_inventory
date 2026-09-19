@@ -2,12 +2,6 @@
 let reportPeriod = 'harian';
 let reportYear = 'all';
 const BULAN_ID = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-function reportPeriodKey(dateStr){
-  if(!dateStr) return '-';
-  if(reportPeriod === 'tahunan') return dateStr.slice(0,4);
-  if(reportPeriod === 'bulanan') return dateStr.slice(0,7); // YYYY-MM
-  return dateStr; // harian: YYYY-MM-DD apa adanya
-}
 function reportPeriodLabel(key){
   if(reportPeriod === 'tahunan') return key;
   if(reportPeriod === 'bulanan'){
@@ -17,6 +11,158 @@ function reportPeriodLabel(key){
   const d = new Date(key + 'T00:00:00');
   return isNaN(d.getTime()) ? key : `${d.getDate()} ${BULAN_ID[d.getMonth()]}`;
 }
+
+function renderLineChart(containerId, labels, seriesA, seriesB, colorA, colorB, labelA, labelB){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+
+  const w = 700, h = 200;
+  const padL = 40, padR = 25, padT = 20, padB = 32;
+  const chartW = w - padL - padR;
+  const chartH = h - padT - padB;
+
+  const rawMax = Math.max(1, ...seriesA, ...seriesB);
+  // Bulatkan batas atas (Y-max) agar kelipatan enak dibaca
+  const mag = Math.pow(10, Math.max(0, Math.floor(Math.log10(rawMax))));
+  const norm = rawMax / mag;
+  let mult = 1;
+  if(norm <= 1) mult = 1.2;
+  else if(norm <= 2) mult = 2.5;
+  else if(norm <= 5) mult = 6;
+  else mult = 12;
+  const max = Math.max(rawMax, Math.ceil(mult * mag));
+
+  const n = labels.length;
+  const stepX = n > 1 ? chartW / (n - 1) : 0;
+  const getX = (i) => n === 1 ? padL + chartW / 2 : padL + i * stepX;
+  const getY = (val) => padT + chartH - (val / max) * chartH;
+
+  const pointsA = seriesA.map((v, i) => ({ x: getX(i), y: getY(v), val: v, label: labels[i] }));
+  const pointsB = seriesB.map((v, i) => ({ x: getX(i), y: getY(v), val: v, label: labels[i] }));
+
+  function createPath(pts){
+    if(pts.length === 0) return '';
+    if(pts.length === 1){
+      return `M${(pts[0].x - 30).toFixed(1)},${pts[0].y.toFixed(1)} L${(pts[0].x + 30).toFixed(1)},${pts[0].y.toFixed(1)}`;
+    }
+    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  }
+
+  function createArea(pts){
+    if(pts.length === 0) return '';
+    if(pts.length === 1){
+      const y = pts[0].y.toFixed(1);
+      const bY = (padT + chartH).toFixed(1);
+      const x1 = (pts[0].x - 30).toFixed(1);
+      const x2 = (pts[0].x + 30).toFixed(1);
+      return `M${x1},${y} L${x2},${y} L${x2},${bY} L${x1},${bY} Z`;
+    }
+    const linePart = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const lastX = pts[pts.length - 1].x.toFixed(1);
+    const firstX = pts[0].x.toFixed(1);
+    const bottomY = (padT + chartH).toFixed(1);
+    return `${linePart} L${lastX},${bottomY} L${firstX},${bottomY} Z`;
+  }
+
+  // Grid horizontal & label angka sumbu Y
+  const ySteps = [0, 0.33, 0.66, 1];
+  const gridLines = ySteps.map(f => {
+    const yVal = Math.round(f * max);
+    const yPos = (padT + chartH - f * chartH).toFixed(1);
+    return `
+      <line x1="${padL}" y1="${yPos}" x2="${w - padR}" y2="${yPos}" stroke="#ECEEF3" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="${padL - 8}" y="${Number(yPos) + 3.5}" font-size="9" fill="#9CA3AF" text-anchor="end" font-weight="600">${yVal}</text>
+    `;
+  }).join('');
+
+  // Sumbu X label lengkap
+  const xLabels = labels.map((lab, i) => {
+    const x = getX(i);
+    return `<text x="${x.toFixed(1)}" y="${h - 8}" font-size="9.5" fill="#6B7280" font-weight="600" text-anchor="middle">${esc(String(lab))}</text>`;
+  }).join('');
+
+  // Titik data (dots)
+  const dotsA = pointsA.map(p => `
+    <g>
+      <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#ffffff" stroke="${colorA}" stroke-width="2.5">
+        <title>${labelA}: ${p.val} (${p.label})</title>
+      </circle>
+      ${p.val > 0 ? `<text x="${p.x.toFixed(1)}" y="${(p.y - 7).toFixed(1)}" font-size="8.5" font-weight="700" fill="${colorA}" text-anchor="middle">${p.val}</text>` : ''}
+    </g>
+  `).join('');
+
+  const dotsB = pointsB.map(p => `
+    <g>
+      <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#ffffff" stroke="${colorB}" stroke-width="2.5">
+        <title>${labelB}: ${p.val} (${p.label})</title>
+      </circle>
+      ${p.val > 0 ? `<text x="${p.x.toFixed(1)}" y="${(p.y - 7).toFixed(1)}" font-size="8.5" font-weight="700" fill="${colorB}" text-anchor="middle">${p.val}</text>` : ''}
+    </g>
+  `).join('');
+
+  const gradAId = 'gradAreaA_' + containerId;
+  const gradBId = 'gradAreaB_' + containerId;
+
+  const svg = `
+    <svg viewBox="0 0 ${w} ${h}" width="100%" height="200" style="overflow:visible;">
+      <defs>
+        <linearGradient id="${gradAId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${colorA}" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="${colorA}" stop-opacity="0.01"/>
+        </linearGradient>
+        <linearGradient id="${gradBId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${colorB}" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="${colorB}" stop-opacity="0.01"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Grid lines & sumbu Y -->
+      ${gridLines}
+
+      <!-- Gradient Area -->
+      <path d="${createArea(pointsA)}" fill="url(#${gradAId})"/>
+      <path d="${createArea(pointsB)}" fill="url(#${gradBId})"/>
+
+      <!-- Garis kurva -->
+      <path d="${createPath(pointsA)}" fill="none" stroke="${colorA}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="${createPath(pointsB)}" fill="none" stroke="${colorB}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Titik & angka nilai -->
+      ${dotsA}
+      ${dotsB}
+
+      <!-- Label sumbu X -->
+      ${xLabels}
+    </svg>
+  `;
+
+  const totalA = seriesA.reduce((s, v) => s + v, 0);
+  const totalB = seriesB.reduce((s, v) => s + v, 0);
+  const diff = totalA - totalB;
+
+  const headerLegend = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line);flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:14px;font-size:11.5px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${colorA};display:inline-block;"></span>
+          <span style="color:var(--ink);font-weight:600;">${labelA}:</span>
+          <b style="color:${colorA};font-size:12px;">${totalA} unit</b>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${colorB};display:inline-block;"></span>
+          <span style="color:var(--ink);font-weight:600;">${labelB}:</span>
+          <b style="color:${colorB};font-size:12px;">${totalB} unit</b>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-soft);background:#F8F9FD;padding:3px 10px;border-radius:12px;border:1px solid #EBEFF5;">
+        Selisih Bersih: <b style="color:${diff >= 0 ? colorA : colorB};">${diff >= 0 ? '+' : ''}${diff} unit</b>
+      </div>
+    </div>
+  `;
+
+  el.innerHTML = headerLegend + svg;
+}
+window.renderLineChart = renderLineChart;
 function populateReportYearOptions(){
   const years = Array.from(new Set(DB.movements.map(m=>(m.date||'').slice(0,4)).filter(Boolean))).sort((a,b)=>b-a);
   const sel = document.getElementById('reportYear');

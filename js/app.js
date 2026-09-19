@@ -9,17 +9,6 @@ function setupAuthKeyListeners(){
       }
     });
   });
-
-  const regFields = [document.getElementById('regName'), document.getElementById('regEmail'), document.getElementById('regPassword')];
-  regFields.forEach(input=>{
-    if(!input) return;
-    input.addEventListener('keydown', (e)=>{
-      if(e.key === 'Enter'){
-        e.preventDefault();
-        window.handleRegister();
-      }
-    });
-  });
 }
 
 function setupLandingCopyGuard(){

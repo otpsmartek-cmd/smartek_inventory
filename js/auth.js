@@ -1,5 +1,4 @@
 /* ============ LANDING SCREEN ============ */
-let pendingRole = null;
 
 /* ---- autentikasi sederhana (client-side) ----
    Login memvalidasi kredensial pengguna yang tersimpan di DB.credentials atau DB.users.
@@ -137,67 +136,6 @@ window.handleLogin = async function(){
   }
 };
 
-window.handleRegister = async function(){
-  clearFieldErrors('regNameErr','regEmailErr','regPasswordErr');
-  const name = document.getElementById('regName').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
-  const password = document.getElementById('regPassword').value.trim();
-  const roleEl = document.querySelector('input[name="regRole"]:checked');
-  const role = roleEl ? roleEl.value : 'Administrator';
-
-  let ok = true;
-  if(!name){ showFieldError('regNameErr', 'Masukkan nama lengkap'); ok = false; }
-  if(!email || !isValidEmail(email)){ showFieldError('regEmailErr', 'Masukkan alamat email valid'); ok = false; }
-  if(!password || password.length < 6){ showFieldError('regPasswordErr', 'Password minimal 6 karakter'); ok = false; }
-  if(!ok) return;
-
-  const btn = document.getElementById('regSubmitBtn');
-  const txt = document.getElementById('regBtnText');
-  if(btn) btn.disabled = true;
-  if(txt) txt.textContent = 'Mendaftarkan...';
-
-  try{
-    const key = email.toLowerCase();
-    const existing = findAccount(key);
-    if(existing){
-      showFieldError('regEmailErr', 'Email ini sudah terdaftar. Silakan beralih ke tab "Masuk".');
-      return;
-    }
-
-    // 1. Simpan segera ke DB lokal (Optimistic / Cache-first)
-    const now = Date.now();
-    if(!DB.credentials) DB.credentials = {};
-    DB.credentials[key] = { name, password, role, createdAt: now };
-    localCacheSet('inv:auth:credentials', DB.credentials);
-
-    if(!Array.isArray(DB.users)) DB.users = [];
-    const newUser = { id: uid(), name, email: key, role, password, lastLogin: now };
-    DB.users = [newUser, ...DB.users.filter(u => (u.email || '').toLowerCase() !== key)];
-    localCacheSet('inv:settings:users', DB.users);
-
-    // 2. Masuk ke aplikasi langsung tanpa terblokir jeda cloud
-    enterApp(role, key, password, false, name);
-    smartekToast(`Selamat datang, ${name}! Akun ${role} berhasil dibuat.`);
-
-    // Catat log pendaftaran & mulai live session
-    recordActivity('DAFTAR_BARU', { userName: name, email: key, role: role, note: 'Pendaftaran mandiri' });
-    startSessionHeartbeat();
-
-    // 3. Sinkronkan ke cloud secara asinkron (non-blocking)
-    Promise.all([
-      storeSet('inv:auth:credentials', DB.credentials),
-      storeSet('inv:settings:users', DB.users)
-    ]).then(() => {
-      console.log('Akun baru berhasil tersinkron ke cloud Google Sheets');
-    }).catch(err => {
-      console.warn('Gagal sinkron akun ke cloud (akan disinkronkan saat online):', err);
-    });
-  } finally {
-    if(btn) btn.disabled = false;
-    if(txt) txt.textContent = 'Daftar Akun Baru';
-  }
-};
-
 window.switchAuthTab = function(tab){
   const isLogin = tab === 'login';
   const tabL = document.getElementById('tabLoginBtn');
@@ -208,7 +146,7 @@ window.switchAuthTab = function(tab){
   if(tabR) tabR.classList.toggle('active', !isLogin);
   if(viewL) viewL.style.display = isLogin ? 'block' : 'none';
   if(viewR) viewR.style.display = isLogin ? 'none' : 'block';
-  clearFieldErrors('loginEmailErr','loginPasswordErr','regNameErr','regEmailErr','regPasswordErr');
+  clearFieldErrors('loginEmailErr','loginPasswordErr');
 };
 
 window.quickFillAdmin = function(){
@@ -241,39 +179,6 @@ window.handleLogout = function(){
   clearFieldErrors('loginEmailErr','loginPasswordErr');
   goPage('dashboard');
   smartekToast('Anda telah keluar');
-};
-
-window.openRoleLogin = function(role){
-  switchAuthTab('login');
-  if(role === 'Administrator' || role === 'Admin'){
-    document.getElementById('loginEmail').value = 'admin@smartek.co.id';
-    document.getElementById('loginPassword').value = 'admin123';
-    smartekToast('Akun Admin terpilih. Klik "Masuk ke Sistem" untuk melanjutkan.');
-  } else {
-    document.getElementById('loginEmail').value = '';
-    document.getElementById('loginPassword').value = '';
-    smartekToast('Silakan masuk dengan akun Pengguna.');
-  }
-  const emailInput = document.getElementById('loginEmail');
-  if(emailInput){
-    emailInput.focus();
-    emailInput.scrollIntoView({ behavior:'smooth', block:'center' });
-  }
-};
-
-window.closeRoleLogin = function(){
-  document.getElementById('roleLoginOverlay').classList.remove('open');
-  pendingRole = null;
-};
-
-window.submitRoleLogin = async function(){
-  const email = document.getElementById('roleLoginEmail').value.trim();
-  const password = document.getElementById('roleLoginPassword').value;
-  const intendedRole = pendingRole;
-  const result = await attemptAuth(email, password, 'roleLoginEmailErr', 'roleLoginPasswordErr', intendedRole);
-  if(!result.ok) return;
-  closeRoleLogin();
-  enterApp(result.role, email, password.trim(), false, result.name);
 };
 
 window.enterApp = async function(role, email, password, silent = false, displayName = null){
