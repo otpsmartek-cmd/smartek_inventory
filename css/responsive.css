@@ -113,10 +113,10 @@
   }
   .sidebar .brand {
     justify-content: space-between;
-    padding: 14px 16px;
-    margin: -18px -12px 14px;
+    padding: 10px 14px;
+    margin: -14px -12px 12px;
     position: sticky;
-    top: -18px;
+    top: -14px;
     z-index: 2;
   }
   .sidebar-close-btn {

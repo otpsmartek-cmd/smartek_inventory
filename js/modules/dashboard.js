@@ -44,17 +44,17 @@ function renderGroupedBars(containerId, labels, seriesA, seriesB, colorA, colorB
   const bars = labels.map((lab,i)=>{
     const hA = Math.max(2, Math.round((seriesA[i]/max)*100));
     const hB = Math.max(2, Math.round((seriesB[i]/max)*100));
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:0;">
-      <div style="display:flex;align-items:flex-end;gap:3px;height:120px;">
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:0;">
+      <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
         <div style="width:14px;background:${colorA};border-radius:3px 3px 0 0;height:${hA}%;" title="${labelA}: ${seriesA[i]}"></div>
         <div style="width:14px;background:${colorB};border-radius:3px 3px 0 0;height:${hB}%;" title="${labelB}: ${seriesB[i]}"></div>
       </div>
-      <div style="font-size:9.5px;color:var(--ink-soft);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">${esc(lab)}</div>
+      <div style="font-size:9px;color:var(--ink-soft);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">${esc(lab)}</div>
     </div>`;
   }).join('');
-  const legend = `<div style="display:flex;gap:14px;margin-bottom:10px;font-size:11px;">
-    <div style="display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:${colorA};display:inline-block;"></span>${labelA}</div>
-    <div style="display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:${colorB};display:inline-block;"></span>${labelB}</div>
+  const legend = `<div style="display:flex;gap:12px;margin-bottom:6px;font-size:10.5px;">
+    <div style="display:flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:${colorA};display:inline-block;"></span>${labelA}</div>
+    <div style="display:flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:${colorB};display:inline-block;"></span>${labelB}</div>
   </div>`;
   document.getElementById(containerId).innerHTML = legend + `<div style="display:flex;gap:8px;align-items:flex-end;">${bars}</div>`;
 }
