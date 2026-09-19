@@ -40,7 +40,10 @@
   <!-- LEFT COLUMN: AUTH FORM -->
   <div class="auth-split-left">
     <div class="auth-left-top">
-      <img id="landingLogo" alt="SMARTEK" class="auth-logo-img" src="assets/logo.png">
+      <div class="auth-brand-lockup">
+        <img id="landingLogo" alt="SMARTEK" class="auth-logo-img" src="assets/logo.png">
+        <div class="auth-brand-title">SMARTEK - Inventory &amp; Stock</div>
+      </div>
       <div class="auth-cloud-badge">
         <span class="badge-dot"></span> Cloud Synchronized
       </div>
@@ -107,55 +110,46 @@
         </button>
       </div>
 
-      <!-- Form Daftar -->
+      <!-- Info Hubungi Admin untuk Daftar Akun -->
       <div id="formRegisterView" style="display:none;">
-        <div class="login-field-wrap">
-          <label for="regName">Nama Lengkap</label>
-          <div class="login-field">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
-            <input type="text" id="regName" placeholder="Contoh: Budi Santoso" autocomplete="name">
+        <div class="auth-notice-card">
+          <div class="auth-notice-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           </div>
-          <div class="field-error" id="regNameErr"></div>
-        </div>
-
-        <div class="login-field-wrap">
-          <label for="regEmail">Alamat Email</label>
-          <div class="login-field">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
-            <input type="email" id="regEmail" placeholder="nama@smartek.co.id" autocomplete="email">
+          <h3 class="auth-notice-title">Pendaftaran Akun Baru</h3>
+          <p class="auth-notice-desc">
+            Untuk daftar akun baru, silakan <b>hubungi Administrator</b> sistem Smartek.
+          </p>
+          <div class="auth-notice-sub">
+            Akses pengguna dibuat dan dikelola secara terpusat oleh Admin guna menjaga keamanan data serta kontrol hak akses inventori perusahaan.
           </div>
-          <div class="field-error" id="regEmailErr"></div>
-        </div>
 
-        <div class="login-field-wrap">
-          <label for="regPassword">Kata Sandi</label>
-          <div class="login-field">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
-            <input type="password" id="regPassword" placeholder="Minimal 6 karakter" autocomplete="new-password">
-            <button type="button" class="pw-eye-btn" onclick="toggleInputPw('regPassword', this)" title="Lihat password">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
+          <div class="auth-contact-box">
+            <div class="auth-contact-row">
+              <div class="auth-contact-ic">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+              </div>
+              <div class="auth-contact-details">
+                <div class="auth-contact-lbl">Email Administrator</div>
+                <a href="mailto:admin@smartek.co.id" class="auth-contact-val">admin@smartek.co.id</a>
+              </div>
+            </div>
+            <div class="auth-contact-row">
+              <div class="auth-contact-ic">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <div class="auth-contact-details">
+                <div class="auth-contact-lbl">Pengelola Akun</div>
+                <div class="auth-contact-val" style="color:var(--ink);">Admin Smartek Innovation</div>
+              </div>
+            </div>
           </div>
-          <div class="field-error" id="regPasswordErr"></div>
-        </div>
 
-        <div class="role-picker-field" style="margin: 10px 0 16px;">
-          <label style="display:block; font-size:12px; font-weight:600; color:var(--ink); margin-bottom:6px;">Peran Akun Baru:</label>
-          <div class="role-options" style="display:flex; flex-direction:column; gap:6px;">
-            <label class="role-opt" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #E2E4EB; border-radius:8px; cursor:pointer; background:#FBFBFC; font-size:12px;">
-              <input type="radio" name="regRole" value="Administrator" checked style="accent-color:var(--red);">
-              <span><b>Admin</b> (Akses Penuh, Pengaturan, &amp; Kelola Pengguna)</span>
-            </label>
-            <label class="role-opt" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #E2E4EB; border-radius:8px; cursor:pointer; background:#FBFBFC; font-size:12px;">
-              <input type="radio" name="regRole" value="Pengguna" style="accent-color:var(--red);">
-              <span><b>Pengguna</b> (Akses Operasional, Stok &amp; Transaksi Saja)</span>
-            </label>
-          </div>
+          <button type="button" class="login-btn" onclick="switchAuthTab('login')" style="margin-top:16px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <span>Kembali ke Halaman Masuk</span>
+          </button>
         </div>
-
-        <button class="login-btn" id="regSubmitBtn" onclick="handleRegister()">
-          <span id="regBtnText">Daftar Akun Baru</span>
-        </button>
       </div>
     </div>
 
@@ -169,6 +163,104 @@
   <div class="auth-split-right">
     <div class="auth-glow auth-glow-1"></div>
     <div class="auth-glow auth-glow-2"></div>
+
+    <!-- BACKGROUND ISOMETRIC ILLUSTRATION -->
+    <div class="showcase-illustration" aria-hidden="true">
+      <svg viewBox="0 0 540 460" fill="none" xmlns="http://www.w3.org/2000/svg" class="showcase-svg">
+        <defs>
+          <linearGradient id="isoCube1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0.04"/>
+          </linearGradient>
+          <linearGradient id="isoCube2" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Perspective Isometric Grid Lines -->
+        <g stroke="rgba(255,255,255,0.09)" stroke-width="1.2">
+          <line x1="60" y1="360" x2="320" y2="210"/>
+          <line x1="120" y1="395" x2="380" y2="245"/>
+          <line x1="180" y1="430" x2="440" y2="280"/>
+          <line x1="240" y1="465" x2="500" y2="315"/>
+
+          <line x1="220" y1="190" x2="480" y2="340"/>
+          <line x1="160" y1="225" x2="420" y2="375"/>
+          <line x1="100" y1="260" x2="360" y2="410"/>
+          <line x1="40" y1="295" x2="300" y2="445"/>
+        </g>
+
+        <!-- Warehouse Rack Structural Frame (Isometric) -->
+        <g stroke="rgba(255,255,255,0.24)" stroke-width="1.8" stroke-linecap="round">
+          <!-- Back vertical poles -->
+          <line x1="180" y1="120" x2="180" y2="320"/>
+          <line x1="320" y1="40" x2="320" y2="240"/>
+          <!-- Front vertical poles -->
+          <line x1="110" y1="160" x2="110" y2="360"/>
+          <line x1="250" y1="80" x2="250" y2="280"/>
+
+          <!-- Shelving Crossbars Tier 1 (Bottom) -->
+          <line x1="110" y1="340" x2="250" y2="260"/>
+          <line x1="250" y1="260" x2="320" y2="220"/>
+          <line x1="110" y1="340" x2="180" y2="300"/>
+          <line x1="180" y1="300" x2="320" y2="220"/>
+
+          <!-- Shelving Crossbars Tier 2 (Middle) -->
+          <line x1="110" y1="260" x2="250" y2="180"/>
+          <line x1="250" y1="180" x2="320" y2="140"/>
+          <line x1="110" y1="260" x2="180" y2="220"/>
+          <line x1="180" y1="220" x2="320" y2="140"/>
+
+          <!-- Shelving Crossbars Tier 3 (Top) -->
+          <line x1="110" y1="180" x2="250" y2="100"/>
+          <line x1="250" y1="100" x2="320" y2="60"/>
+          <line x1="110" y1="180" x2="180" y2="140"/>
+          <line x1="180" y1="140" x2="320" y2="60"/>
+        </g>
+
+        <!-- Isometric Box 1 on Tier 2 -->
+        <g transform="translate(135, 205)">
+          <polygon points="28,0 56,16 28,32 0,16" fill="url(#isoCube1)" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/>
+          <polygon points="0,16 28,32 28,62 0,46" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.25)" stroke-width="1.2"/>
+          <polygon points="28,32 56,16 56,46 28,62" fill="rgba(0,0,0,0.18)" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+        </g>
+
+        <!-- Isometric Box 2 on Tier 2 -->
+        <g transform="translate(200, 168)">
+          <polygon points="24,0 48,14 24,28 0,14" fill="url(#isoCube2)" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/>
+          <polygon points="0,14 24,28 24,54 0,40" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+          <polygon points="24,28 48,14 48,40 24,54" fill="rgba(0,0,0,0.15)" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+        </g>
+
+        <!-- Large Floating Glass Container Cube (Right side) -->
+        <g transform="translate(330, 220)">
+          <!-- Top face -->
+          <polygon points="70,0 140,40 70,80 0,40" fill="url(#isoCube1)" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+          <!-- Left face -->
+          <polygon points="0,40 70,80 70,160 0,120" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <!-- Right face -->
+          <polygon points="70,80 140,40 140,120 70,160" fill="rgba(0,0,0,0.25)" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+
+          <!-- Tech lines & Barcode inside container -->
+          <line x1="25" y1="85" x2="25" y2="135" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+          <line x1="33" y1="90" x2="33" y2="140" stroke="rgba(255,255,255,0.4)" stroke-width="2.5"/>
+          <line x1="41" y1="95" x2="41" y2="145" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+          <line x1="49" y1="100" x2="49" y2="150" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+        </g>
+
+        <!-- Floating Data Nodes / Pulse Dots -->
+        <g fill="#22C55E">
+          <circle cx="215" cy="180" r="4.5"/>
+          <circle cx="365" cy="140" r="3.5"/>
+          <circle cx="140" cy="275" r="4"/>
+        </g>
+        <g stroke="rgba(34, 197, 94, 0.45)" stroke-dasharray="3 3" stroke-width="1.2">
+          <line x1="215" y1="180" x2="365" y2="140"/>
+          <line x1="140" y1="275" x2="215" y2="180"/>
+        </g>
+      </svg>
+    </div>
 
     <div class="showcase-top">
       <div class="showcase-badge">
