@@ -757,13 +757,40 @@
     <div class="modal-head"><h2>Ubah Profil</h2><button class="close-x" onclick="closeProfileEditModal()">×</button></div>
     <div class="modal-body">
       <div class="field"><label>Nama</label><input id="peName" type="text" placeholder="Nama lengkap"></div>
-      <div class="field"><label>Email</label><input id="peEmail" type="text" placeholder="email@smartek.co.id"></div>
+      <div class="field"><label>Email</label><input id="peEmail" type="text" placeholder="email@smartek.co.id" disabled style="background:#f4f4f5;color:var(--ink-soft);cursor:not-allowed;"></div>
       <div class="field"><label>Role</label>
         <input id="peRole" type="text" disabled style="background:#f4f4f5;color:var(--ink-soft);cursor:not-allowed;">
         <div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Peran ditentukan otomatis saat login/daftar dan tidak bisa diubah di sini.</div>
       </div>
+
+      <div style="margin:16px 0 12px;padding-top:14px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;font-weight:700;color:var(--ink);">Ganti Password Akun</span>
+        <span style="font-size:10.5px;color:var(--ink-soft);background:#F1F5F9;padding:2px 8px;border-radius:10px;">Opsional</span>
+      </div>
+
+      <div class="field">
+        <label for="peNewPassword">Password Baru</label>
+        <div class="field-pw-wrap">
+          <input id="peNewPassword" type="password" placeholder="Kosongkan jika tidak ingin mengubah password" autocomplete="new-password">
+          <button type="button" class="field-pw-btn" onclick="toggleInputPw('peNewPassword', this)" title="Lihat password" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="peConfirmPassword">Konfirmasi Password Baru</label>
+        <div class="field-pw-wrap">
+          <input id="peConfirmPassword" type="password" placeholder="Ketik ulang password baru" autocomplete="new-password">
+          <button type="button" class="field-pw-btn" onclick="toggleInputPw('peConfirmPassword', this)" title="Lihat password" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="field-error" id="pePasswordErr" style="margin-top:6px;"></div>
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Minimal 6 karakter. Password baru akan langsung digunakan untuk login berikutnya.</div>
+      </div>
     </div>
-    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeProfileEditModal()">Batal</button><button class="btn btn-primary" onclick="saveProfileEdit()">Simpan</button></div>
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeProfileEditModal()">Batal</button><button class="btn btn-primary" onclick="saveProfileEdit()">Simpan Perubahan</button></div>
   </div>
 </div>
 

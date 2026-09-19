@@ -286,12 +286,49 @@ window.openProfileEditModal = function(){
   document.getElementById('peName').value = prof.name;
   document.getElementById('peEmail').value = prof.email;
   document.getElementById('peRole').value = prof.role;
+
+  const newPwEl = document.getElementById('peNewPassword');
+  const confPwEl = document.getElementById('peConfirmPassword');
+  const errEl = document.getElementById('pePasswordErr');
+  if(newPwEl) newPwEl.value = '';
+  if(confPwEl) confPwEl.value = '';
+  if(errEl){ errEl.textContent = ''; errEl.classList.remove('show'); }
+
   document.getElementById('profileEditOverlay').classList.add('open');
 };
-window.closeProfileEditModal = function(){ document.getElementById('profileEditOverlay').classList.remove('open'); };
+window.closeProfileEditModal = function(){
+  const newPwEl = document.getElementById('peNewPassword');
+  const confPwEl = document.getElementById('peConfirmPassword');
+  const errEl = document.getElementById('pePasswordErr');
+  if(newPwEl) newPwEl.value = '';
+  if(confPwEl) confPwEl.value = '';
+  if(errEl){ errEl.textContent = ''; errEl.classList.remove('show'); }
+  document.getElementById('profileEditOverlay').classList.remove('open');
+};
 window.saveProfileEdit = async function(){
   const name = document.getElementById('peName').value.trim();
   if(!name){ smartekToast('Nama wajib diisi'); return; }
+
+  const newPw = (document.getElementById('peNewPassword')?.value || '').trim();
+  const confirmPw = (document.getElementById('peConfirmPassword')?.value || '').trim();
+  const errEl = document.getElementById('pePasswordErr');
+  if(errEl){ errEl.textContent = ''; errEl.classList.remove('show'); }
+
+  let isPasswordChanged = false;
+  if(newPw || confirmPw){
+    if(newPw.length < 6){
+      if(errEl){ errEl.textContent = 'Password baru minimal 6 karakter'; errEl.classList.add('show'); }
+      else smartekToast('Password baru minimal 6 karakter');
+      return;
+    }
+    if(newPw !== confirmPw){
+      if(errEl){ errEl.textContent = 'Konfirmasi password tidak cocok dengan password baru'; errEl.classList.add('show'); }
+      else smartekToast('Konfirmasi password tidak cocok');
+      return;
+    }
+    isPasswordChanged = true;
+  }
+
   const prof = getActiveProfile();
   const emailKey = (prof.email || '').toLowerCase().trim();
   
@@ -303,22 +340,26 @@ window.saveProfileEdit = async function(){
   };
   localCacheSet('inv:settings:profile', DB.profile);
   
-  // 2. Perbarui nama di DB.users
+  // 2. Perbarui nama & password di DB.users
   if(Array.isArray(DB.users)){
     const idx = DB.users.findIndex(u => (u.email || '').toLowerCase().trim() === emailKey);
     if(idx >= 0){
       DB.users[idx].name = name;
+      if(isPasswordChanged) DB.users[idx].password = newPw;
       localCacheSet('inv:settings:users', DB.users);
       storeSet('inv:settings:users', DB.users).catch(()=>{});
     }
   }
   
-  // 3. Perbarui nama di DB.credentials
-  if(DB.credentials && DB.credentials[emailKey]){
-    DB.credentials[emailKey].name = name;
-    localCacheSet('inv:auth:credentials', DB.credentials);
-    storeSet('inv:auth:credentials', DB.credentials).catch(()=>{});
+  // 3. Perbarui nama & password di DB.credentials
+  if(!DB.credentials) DB.credentials = {};
+  if(!DB.credentials[emailKey]){
+    DB.credentials[emailKey] = { name: name, role: prof.role, createdAt: Date.now() };
   }
+  DB.credentials[emailKey].name = name;
+  if(isPasswordChanged) DB.credentials[emailKey].password = newPw;
+  localCacheSet('inv:auth:credentials', DB.credentials);
+  storeSet('inv:auth:credentials', DB.credentials).catch(()=>{});
   
   // 4. Update header
   const nameEl = document.querySelector('.user .name');
@@ -328,7 +369,7 @@ window.saveProfileEdit = async function(){
   
   renderProfile();
   closeProfileEditModal();
-  smartekToast('Profil berhasil diperbarui');
+  smartekToast(isPasswordChanged ? 'Profil dan password berhasil diperbarui' : 'Profil berhasil diperbarui');
 };
 
 window.renderProfile = renderProfile;

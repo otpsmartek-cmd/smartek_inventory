@@ -103,6 +103,11 @@
   .field label{display:block;font-size:11px;font-weight:600;color:var(--ink-soft);margin-bottom:4px;}
   .field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;background:#fff;color:var(--ink);}
   .field input:focus,.field select:focus{outline:2px solid var(--blue);border-color:var(--blue);}
+  .field-pw-wrap{position:relative;display:flex;align-items:center;width:100%;}
+  .field-pw-wrap input{padding-right:38px;}
+  .field-pw-btn{position:absolute;right:8px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:4px;display:flex;align-items:center;justify-content:center;transition:color .2s ease;}
+  .field-pw-btn:hover{color:var(--ink);}
+  .field-pw-btn svg{width:16px;height:16px;}
   .field-error{display:none;color:#C22222;font-size:11px;font-weight:600;margin:-6px 0 10px;}
   .field-error.show{display:block;}
   .login-field.has-error{border-color:#E5484D;}
