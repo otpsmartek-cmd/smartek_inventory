@@ -135,18 +135,6 @@
   .login-btn:active { transform: translateY(0); }
   .login-btn:disabled { opacity: .65; cursor: not-allowed; transform: none; }
 
-  .quick-admin-btn {
-    display: flex; align-items: center; justify-content: center; gap: 7px;
-    width: 100%; border: 1.5px dashed #CBD0DD; border-radius: 9px;
-    padding: 9px; background: #F8F9FC; font-size: 11.5px; font-weight: 600;
-    color: var(--ink-soft); cursor: pointer; margin-top: 10px; font-family: inherit;
-    transition: all .2s ease;
-  }
-  .quick-admin-btn:hover {
-    background: #FFF5F5; color: var(--red); border-color: var(--red);
-  }
-  .quick-admin-btn svg { width: 13px; height: 13px; color: var(--red); }
-
   /* NOTICE HUBUNGI ADMIN */
   .auth-notice-card {
     background: #F8F9FD; border: 1.5px solid #E2E6F0; border-radius: 12px;

@@ -149,14 +149,6 @@ window.switchAuthTab = function(tab){
   clearFieldErrors('loginEmailErr','loginPasswordErr');
 };
 
-window.quickFillAdmin = function(){
-  switchAuthTab('login');
-  document.getElementById('loginEmail').value = 'admin@smartek.co.id';
-  document.getElementById('loginPassword').value = 'admin123';
-  clearFieldErrors('loginEmailErr','loginPasswordErr');
-  smartekToast('Akun demo Admin terisi!');
-};
-
 window.toggleInputPw = function(inputId, btn){
   const input = document.getElementById(inputId);
   if(!input) return;
