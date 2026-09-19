@@ -12,10 +12,10 @@ function reportPeriodLabel(key){
   if(reportPeriod === 'tahunan') return key;
   if(reportPeriod === 'bulanan'){
     const [y,m] = key.split('-');
-    return `${BULAN_ID[Number(m)-1] || m} ${y}`;
+    return `${BULAN_ID[Number(m)-1] || m}`;
   }
   const d = new Date(key + 'T00:00:00');
-  return isNaN(d) ? key : d.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+  return isNaN(d.getTime()) ? key : `${d.getDate()} ${BULAN_ID[d.getMonth()]}`;
 }
 function populateReportYearOptions(){
   const years = Array.from(new Set(DB.movements.map(m=>(m.date||'').slice(0,4)).filter(Boolean))).sort((a,b)=>b-a);
@@ -37,8 +37,6 @@ function renderReports(){
   const scoped = movementsForReport();
   const totalIn = scoped.filter(m=>m.type==='in').reduce((s,m)=>s+(Number(m.qty)||0),0);
   const totalOut = scoped.filter(m=>m.type==='out').reduce((s,m)=>s+(Number(m.qty)||0),0);
-  // Stok Akhir & Nilai Inventori adalah kondisi TERKINI barang, jadi selalu total keseluruhan
-  // (tidak ikut difilter per periode) — beda konsepnya dari arus masuk/keluar di atas.
   const totalFinal = items.reduce((s,i)=>s+(Number(i.qty)||0),0);
   const totalValue = items.reduce((s,i)=>s+(Number(i.qty)||0)*(Number(i.price)||0),0);
   document.getElementById('rIn').textContent = totalIn.toLocaleString('id-ID');
@@ -47,16 +45,57 @@ function renderReports(){
   document.getElementById('rValue').textContent = rupiah(totalValue);
 
   const byPeriod = {};
-  scoped.forEach(m=>{ const k = reportPeriodKey(m.date); if(!byPeriod[k]) byPeriod[k]={in:0,out:0}; byPeriod[k][m.type]+=Number(m.qty)||0; });
+  if(reportPeriod === 'harian'){
+    // Siapkan rentang 7 hari terakhir agar kurva grafik bersambung dan terbaca jelas
+    const now = new Date();
+    for(let i = 6; i >= 0; i--){
+      const cur = new Date(now.getTime() - i * 86400000);
+      const k = cur.toISOString().slice(0, 10);
+      byPeriod[k] = { in: 0, out: 0 };
+    }
+    scoped.forEach(m=>{
+      const k = (m.date || '').slice(0, 10);
+      if(!k) return;
+      if(!byPeriod[k]) byPeriod[k] = { in: 0, out: 0 };
+      byPeriod[k][m.type] = (byPeriod[k][m.type] || 0) + (Number(m.qty) || 0);
+    });
+  } else if(reportPeriod === 'bulanan'){
+    // Siapkan 12 bulan kalender lengkap
+    const yr = reportYear === 'all' ? new Date().getFullYear() : Number(reportYear);
+    for(let m = 1; m <= 12; m++){
+      const k = `${yr}-${String(m).padStart(2, '0')}`;
+      byPeriod[k] = { in: 0, out: 0 };
+    }
+    scoped.forEach(m=>{
+      const k = (m.date || '').slice(0, 7);
+      if(!k) return;
+      if(!byPeriod[k]) byPeriod[k] = { in: 0, out: 0 };
+      byPeriod[k][m.type] = (byPeriod[k][m.type] || 0) + (Number(m.qty) || 0);
+    });
+  } else {
+    // Tahunan
+    scoped.forEach(m=>{
+      const k = (m.date || '').slice(0, 4);
+      if(!k) return;
+      if(!byPeriod[k]) byPeriod[k] = { in: 0, out: 0 };
+      byPeriod[k][m.type] = (byPeriod[k][m.type] || 0) + (Number(m.qty) || 0);
+    });
+    const yKeys = Object.keys(byPeriod);
+    if(yKeys.length === 1){
+      const yNum = Number(yKeys[0]) || new Date().getFullYear();
+      byPeriod[String(yNum - 1)] = { in: 0, out: 0 };
+      byPeriod[String(yNum + 1)] = { in: 0, out: 0 };
+    }
+  }
+
   const keys = Object.keys(byPeriod).sort();
-  const periodNoun = reportPeriod === 'tahunan' ? 'tahun' : reportPeriod === 'bulanan' ? 'bulan' : 'tanggal';
-  document.getElementById('trendNote').textContent = keys.length===0
-    ? 'Belum ada transaksi tercatat — grafik akan terisi setelah kamu mencatat di Stock In / Stock Out.'
-    : `Menampilkan ${keys.length} ${periodNoun} transaksi.`;
+  const periodNoun = reportPeriod === 'tahunan' ? 'tahun' : reportPeriod === 'bulanan' ? 'bulan' : 'hari';
+  document.getElementById('trendNote').textContent = `Menampilkan pergerakan stok dalam ${keys.length} ${periodNoun} terakhir.`;
+
   renderLineChart('trendChart',
-    keys.length ? keys.map(reportPeriodLabel) : ['-'],
-    keys.length ? keys.map(k=>byPeriod[k].in) : [0],
-    keys.length ? keys.map(k=>byPeriod[k].out) : [0],
+    keys.map(reportPeriodLabel),
+    keys.map(k=>byPeriod[k].in),
+    keys.map(k=>byPeriod[k].out),
     '#22A559', '#E5484D', 'Stok Masuk', 'Stok Keluar'
   );
 
@@ -67,10 +106,14 @@ function renderReports(){
   const rows = Object.values(turnover).sort((a,b)=>(b.in+b.out)-(a.in+a.out)).slice(0,10);
   document.getElementById('turnoverBody').innerHTML = (rows.length===0 || rows.every(r=>r.in===0&&r.out===0))
     ? `<tr class="empty-row"><td colspan="5">Belum ada transaksi.</td></tr>`
-    : rows.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.category||'-')}</td><td style="color:var(--green);">+${r.in}</td><td style="color:#C22222;">-${r.out}</td><td>${r.qty}</td></tr>`).join('');
+    : rows.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.category||'-')}</td><td style="color:var(--green);font-weight:700;">+${r.in}</td><td style="color:#C22222;font-weight:700;">-${r.out}</td><td><b>${r.qty}</b></td></tr>`).join('');
 }
+
+window.renderReports = renderReports;
+
 document.getElementById('reportPeriod').addEventListener('change', (e)=>{ reportPeriod = e.target.value; renderReports(); });
 document.getElementById('reportYear').addEventListener('change', (e)=>{ reportYear = e.target.value; renderReports(); });
+
 
 /* ============ ALERTS ============ */
 function renderAlerts(){
