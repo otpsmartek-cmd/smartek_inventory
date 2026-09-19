@@ -783,9 +783,16 @@
         <div class="field-error" id="pePasswordErr" style="margin-top:6px;"></div>
         <div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Minimal 6 karakter. Password baru akan langsung digunakan untuk login berikutnya.</div>
       </div>
+    <div class="modal-foot" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <button type="button" class="btn btn-ghost" onclick="closeProfileEditModal(); handleLogout();" style="color:var(--red);border-color:rgba(196,30,42,0.35);padding:7px 12px;font-size:12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px;margin-right:4px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        Keluar Akun
+      </button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="closeProfileEditModal()">Batal</button>
+        <button class="btn btn-primary" onclick="saveProfileEdit()">Simpan Perubahan</button>
+      </div>
     </div>
-    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeProfileEditModal()">Batal</button><button class="btn btn-primary" onclick="saveProfileEdit()">Simpan Perubahan</button></div>
-  </div>
 </div>
 
 <!-- Modal: Lupa / Reset Password -->

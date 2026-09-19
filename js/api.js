@@ -115,11 +115,26 @@ async function checkRemoteSync(){
   }
 }
 
+function checkSessionExpiry(){
+  if(document.documentElement.classList.contains('user-authenticated')){
+    const s = typeof getSavedSession === 'function' ? getSavedSession() : null;
+    if(!s && typeof window.handleLogout === 'function'){
+      window.handleLogout(true);
+    }
+  }
+}
+
 function setupRealtimeSync(){
-  // Sinkronisasi otomatis saat pengguna kembali membuka tab ini
-  window.addEventListener('focus', checkRemoteSync);
+  // Sinkronisasi otomatis & cek sesi saat pengguna kembali membuka tab ini
+  window.addEventListener('focus', ()=>{
+    checkSessionExpiry();
+    checkRemoteSync();
+  });
   // Cek berkala di latar belakang setiap 25 detik
-  setInterval(checkRemoteSync, 25000);
+  setInterval(()=>{
+    checkSessionExpiry();
+    checkRemoteSync();
+  }, 25000);
 }
 
 /* ============ USER ACTIVITY & LIVE SESSIONS (Google Sheets) ============ */

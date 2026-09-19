@@ -11,7 +11,7 @@
   .app{display:flex;min-height:100vh;}
 
   .sidebar{width:220px;flex-shrink:0;background:linear-gradient(180deg,var(--red),var(--red-dark));color:#fff;
-    display:flex;flex-direction:column;padding:14px 12px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+    display:flex;flex-direction:column;padding:14px 12px;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .brand{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;margin:-14px -12px 12px;background:#fff;border-bottom:1px solid rgba(0,0,0,0.06);}
   .brand-lockup{display:flex;align-items:center;gap:9px;min-width:0;}
   .brand-logo-img{width:32px;height:32px;object-fit:contain;flex-shrink:0;}

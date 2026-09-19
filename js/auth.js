@@ -35,11 +35,15 @@ function clearFieldErrors(...ids){
 
 /* ============ SESSION & KREDENSIAL ============ */
 const SESSION_STORAGE_KEY = 'smartek:auth_session';
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // Tepat 24 Jam
 
 function saveSession(email, role, name){
   try {
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
-      email, role, name: name || deriveNameFromEmail(email), loginAt: Date.now()
+      email,
+      role,
+      name: name || deriveNameFromEmail(email),
+      loginAt: Date.now()
     }));
   }catch(e){}
 }
@@ -49,7 +53,16 @@ function clearSession(){
 function getSavedSession(){
   try {
     const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if(!raw) return null;
+    const s = JSON.parse(raw);
+    if(!s || !s.email || !s.loginAt) return null;
+    const now = Date.now();
+    const age = now - Number(s.loginAt);
+    if(age > SESSION_MAX_AGE_MS || age < 0){
+      clearSession();
+      return null;
+    }
+    return s;
   }catch(e){ return null; }
 }
 
@@ -210,10 +223,15 @@ window.toggleInputPw = function(inputId, btn){
   btn.style.color = isPw ? 'var(--red)' : 'var(--ink-soft)';
 };
 
-window.handleLogout = function(){
+window.handleLogout = function(isExpired = false){
   const session = getSavedSession();
   if(session){
-    recordActivity('LOGOUT', { userName: session.name, email: session.email, role: session.role, note: 'Pengguna keluar sistem' });
+    recordActivity('LOGOUT', {
+      userName: session.name,
+      email: session.email,
+      role: session.role,
+      note: isExpired ? 'Sesi login berakhir (24 jam)' : 'Pengguna keluar sistem'
+    });
   }
   stopSessionHeartbeat();
   clearSession();
@@ -223,7 +241,11 @@ window.handleLogout = function(){
   document.getElementById('loginPassword').value = '';
   clearFieldErrors('loginEmailErr','loginPasswordErr');
   goPage('dashboard');
-  smartekToast('Anda telah keluar');
+  if(isExpired){
+    smartekToast('Sesi login telah berakhir (24 jam). Silakan masuk kembali.', 4500);
+  } else {
+    smartekToast('Anda telah keluar');
+  }
 };
 
 window.enterApp = async function(role, email, password, silent = false, displayName = null){
