@@ -790,19 +790,22 @@
 
 <!-- Modal: Lupa / Reset Password -->
 <div class="overlay" id="resetPasswordOverlay" style="z-index:250;">
-  <div class="modal" style="max-width:380px;">
+  <div class="modal" style="max-width:400px;">
     <div class="modal-head"><h2>Atur Ulang Password</h2><button class="close-x" onclick="closeForgotPassword()">×</button></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 14px;">Masukkan email akun Anda. Password lama untuk email tersebut akan dihapus, lalu Anda bisa langsung login dengan password baru (login berikutnya akan dianggap sebagai pendaftaran ulang).</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 14px;line-height:1.5;">Masukkan alamat email akun Anda. Sistem akan membuatkan kata sandi baru (sementara) dan mengirimkannya langsung ke kotak masuk email Anda.</p>
       <div class="field">
-        <label>Email</label>
-        <input id="resetEmail" type="text" placeholder="email@smartek.co.id">
+        <label for="resetEmail">Alamat Email Terdaftar</label>
+        <input id="resetEmail" type="email" placeholder="email@smartek.co.id" autocomplete="email">
         <div class="field-error" id="resetEmailErr"></div>
+      </div>
+      <div style="background:#F8FAFC;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--ink-soft);line-height:1.45;margin-top:6px;">
+        💡 Setelah menerima kata sandi di email, silakan masuk ke sistem lalu ganti password Anda melalui menu <b>Profile &gt; Ubah Profil</b>.
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeForgotPassword()">Batal</button>
-      <button class="btn btn-primary" onclick="confirmResetPassword()">Reset Password</button>
+      <button class="btn btn-primary" id="resetSubmitBtn" onclick="confirmResetPassword()">Kirim Password ke Email</button>
     </div>
   </div>
 </div>

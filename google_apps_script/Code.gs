@@ -776,6 +776,116 @@ function doPost(e) {
       
       return respondJson({ ok: true, sessionId: sessionId, status: statusText });
     }
+
+    // 4. RESET PASSWORD (Kirim Email Kata Sandi Sementara via MailApp)
+    if (action === 'resetPassword') {
+      var email = (body.email || '').toLowerCase().trim();
+      if (!email) {
+        return respondJson({ ok: false, error: 'Email wajib diisi' });
+      }
+
+      var sysSheet = getDatabaseSheet();
+      var data = sysSheet.getDataRange().getValues();
+      var usersList = [];
+      var credsObj = {};
+      var userFound = null;
+
+      for (var i = 0; i < data.length; i++) {
+        var k = String(data[i][0]);
+        if (k === 'inv:settings:users') {
+          try { usersList = JSON.parse(data[i][1]); } catch(e) {}
+        } else if (k === 'inv:auth:credentials') {
+          try { credsObj = JSON.parse(data[i][1]); } catch(e) {}
+        }
+      }
+
+      if (Array.isArray(usersList)) {
+        for (var u = 0; u < usersList.length; u++) {
+          if ((usersList[u].email || '').toLowerCase().trim() === email) {
+            userFound = usersList[u];
+            break;
+          }
+        }
+      }
+      if (!userFound && credsObj[email]) {
+        userFound = { name: credsObj[email].name || 'Pengguna', email: email, role: credsObj[email].role || 'Administrator' };
+      }
+
+      if (!userFound) {
+        return respondJson({ ok: false, error: 'Email ini belum terdaftar di sistem Smartek.' });
+      }
+
+      // Generate kata sandi baru (sementara) yang mudah diketik namun aman
+      var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      var tempPassword = "SMK";
+      for (var c = 0; c < 5; c++) {
+        tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
+      if (!credsObj[email]) credsObj[email] = {};
+      credsObj[email].password = tempPassword;
+      credsObj[email].name = userFound.name || credsObj[email].name || 'Pengguna';
+      credsObj[email].updatedAt = Date.now();
+
+      if (Array.isArray(usersList)) {
+        for (var u = 0; u < usersList.length; u++) {
+          if ((usersList[u].email || '').toLowerCase().trim() === email) {
+            usersList[u].password = tempPassword;
+            break;
+          }
+        }
+      }
+
+      var now = Date.now();
+      for (var i = 0; i < data.length; i++) {
+        var k = String(data[i][0]);
+        if (k === 'inv:settings:users') {
+          sysSheet.getRange(i + 1, 2).setValue(JSON.stringify(usersList));
+          sysSheet.getRange(i + 1, 3).setValue(now);
+        } else if (k === 'inv:auth:credentials') {
+          sysSheet.getRange(i + 1, 2).setValue(JSON.stringify(credsObj));
+          sysSheet.getRange(i + 1, 3).setValue(now);
+        }
+      }
+      PropertiesService.getScriptProperties().setProperty('latestUpdate', now.toString());
+
+      var htmlEmail = '<div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;background:#ffffff;">' +
+        '<div style="background:linear-gradient(135deg,#C41E2A,#991B1B);padding:24px;text-align:center;color:#ffffff;">' +
+          '<h2 style="margin:0;font-size:20px;letter-spacing:0.5px;">SMARTEK INVENTORY &amp; STOCK</h2>' +
+          '<div style="font-size:12px;opacity:0.9;margin-top:4px;">Atur Ulang Kata Sandi Akun</div>' +
+        '</div>' +
+        '<div style="padding:28px 24px;color:#1E293B;font-size:14px;line-height:1.6;">' +
+          '<p style="margin-top:0;">Halo <b>' + (userFound.name || 'Pengguna') + '</b>,</p>' +
+          '<p>Kami menerima permintaan untuk mengatur ulang kata sandi akun inventori Anda (<b>' + email + '</b>).</p>' +
+          '<div style="background:#F8FAFC;border:1.5px dashed #CBD5E1;border-radius:8px;padding:16px;text-align:center;margin:20px 0;">' +
+            '<div style="font-size:12px;color:#64748B;margin-bottom:6px;">Kata Sandi Baru (Sementara) Anda:</div>' +
+            '<div style="font-size:22px;font-weight:bold;letter-spacing:3px;color:#C41E2A;font-family:monospace;">' + tempPassword + '</div>' +
+          '</div>' +
+          '<p style="margin-bottom:8px;"><b>Langkah Masuk:</b></p>' +
+          '<ol style="margin-top:4px;padding-left:20px;color:#475569;">' +
+            '<li>Buka sistem inventori Smartek dan masukkan email serta kata sandi sementara di atas.</li>' +
+            '<li>Setelah berhasil masuk, buka menu <b>Profile &gt; Ubah Profil</b> untuk mengganti kata sandi sesuai keinginan Anda.</li>' +
+          '</ol>' +
+          '<div style="margin-top:24px;padding:12px;background:#FEF2F2;border-left:4px solid #EF4444;border-radius:4px;font-size:12px;color:#991B1B;">' +
+            'Jika Anda tidak merasa melakukan permintaan ini, segera hubungi Administrator sistem Smartek.' +
+          '</div>' +
+        '</div>' +
+        '<div style="background:#F1F5F9;padding:14px 24px;text-align:center;font-size:11px;color:#64748B;border-top:1px solid #E2E8F0;">' +
+          '&copy; 2026 PT Smartek Innovation — Enterprise Inventory &amp; Stock System.' +
+        '</div>' +
+      '</div>';
+
+      try {
+        MailApp.sendEmail({
+          to: email,
+          subject: "[SMARTEK] Kata Sandi Baru Akun Inventori Anda",
+          htmlBody: htmlEmail
+        });
+        return respondJson({ ok: true, tempPassword: tempPassword, emailSent: true });
+      } catch(mailErr) {
+        return respondJson({ ok: true, tempPassword: tempPassword, emailSent: false, warning: mailErr.toString() });
+      }
+    }
     
     return respondJson({ ok: false, error: 'Unknown action' });
   } catch(err) {

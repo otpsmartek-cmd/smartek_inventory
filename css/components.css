@@ -108,9 +108,9 @@
   .field-pw-btn{position:absolute;right:8px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:4px;display:flex;align-items:center;justify-content:center;transition:color .2s ease;}
   .field-pw-btn:hover{color:var(--ink);}
   .field-pw-btn svg{width:16px;height:16px;}
-  .field-error{display:none;color:#C22222;font-size:11px;font-weight:600;margin:-6px 0 10px;}
+  .field-error{display:none;color:#DC2626;font-size:11.5px;font-weight:600;margin:6px 0 6px;line-height:1.4;}
   .field-error.show{display:block;}
-  .login-field.has-error{border-color:#E5484D;}
+  .login-field.has-error{border-color:#DC2626 !important;}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .photo-upload{border:2px dashed var(--line);border-radius:8px;padding:12px;text-align:center;cursor:pointer;background:#fff;position:relative;}
   .photo-upload:hover{border-color:var(--blue);}

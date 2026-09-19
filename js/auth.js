@@ -12,11 +12,24 @@ function showFieldError(id, msg){
   if(!el) return;
   el.textContent = msg;
   el.classList.add('show');
+  const parentWrap = el.closest('.login-field-wrap') || el.closest('.field');
+  if(parentWrap){
+    const fieldBox = parentWrap.querySelector('.login-field');
+    if(fieldBox) fieldBox.classList.add('has-error');
+  }
 }
 function clearFieldErrors(...ids){
   ids.forEach(id=>{
     const el = document.getElementById(id);
-    if(el){ el.textContent = ''; el.classList.remove('show'); }
+    if(el){
+      el.textContent = '';
+      el.classList.remove('show');
+      const parentWrap = el.closest('.login-field-wrap') || el.closest('.field');
+      if(parentWrap){
+        const fieldBox = parentWrap.querySelector('.login-field');
+        if(fieldBox) fieldBox.classList.remove('has-error');
+      }
+    }
   });
 }
 
@@ -258,25 +271,69 @@ window.confirmResetPassword = async function(){
   const key = email.toLowerCase();
   const acc = findAccount(key);
   if(!acc){
-    showFieldError('resetEmailErr', 'Email ini belum pernah terdaftar, jadi tidak ada password yang perlu direset.');
+    showFieldError('resetEmailErr', 'Email ini belum terdaftar di sistem.');
     return;
   }
-  if(DB.credentials && DB.credentials[key]){
-    delete DB.credentials[key];
-    localCacheSet('inv:auth:credentials', DB.credentials);
-    storeSet('inv:auth:credentials', DB.credentials).catch(()=>{});
-  }
-  if(DB.users && Array.isArray(DB.users)){
-    const u = DB.users.find(x => (x.email || '').toLowerCase() === key);
-    if(u){
-      delete u.password;
-      localCacheSet('inv:settings:users', DB.users);
-      storeSet('inv:settings:users', DB.users).catch(()=>{});
+
+  const btn = document.getElementById('resetSubmitBtn');
+  const origText = btn ? btn.innerHTML : 'Kirim Password ke Email';
+  if(btn){ btn.disabled = true; btn.textContent = 'Mengirim email...'; }
+
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'resetPassword', email: key })
+    });
+    const json = await res.json();
+
+    if(json && json.ok && json.tempPassword){
+      if(!DB.credentials) DB.credentials = {};
+      if(!DB.credentials[key]) DB.credentials[key] = { name: acc.name, role: acc.role, createdAt: Date.now() };
+      DB.credentials[key].password = json.tempPassword;
+      localCacheSet('inv:auth:credentials', DB.credentials);
+
+      if(Array.isArray(DB.users)){
+        const u = DB.users.find(x => (x.email || '').toLowerCase() === key);
+        if(u) { u.password = json.tempPassword; localCacheSet('inv:settings:users', DB.users); }
+      }
+
+      closeForgotPassword();
+      document.getElementById('loginEmail').value = email;
+      document.getElementById('loginPassword').value = '';
+      clearFieldErrors('loginEmailErr','loginPasswordErr');
+
+      if(json.emailSent !== false){
+        smartekToast(`Kata sandi baru telah dikirim ke ${email}. Silakan cek kotak masuk/spam Anda.`);
+      } else {
+        smartekToast(`Password sementara akun Anda: ${json.tempPassword}. Silakan gunakan untuk masuk.`);
+      }
+      return;
     }
+
+    if(json && !json.ok){
+      showFieldError('resetEmailErr', json.error || 'Gagal memproses reset password');
+      return;
+    }
+  } catch(err){
+    console.warn('resetPassword cloud call failed, using local temporary password:', err);
+    const tempPw = 'SMK' + Math.random().toString(36).substring(2, 7).toUpperCase();
+    if(!DB.credentials) DB.credentials = {};
+    if(!DB.credentials[key]) DB.credentials[key] = { name: acc.name, role: acc.role, createdAt: Date.now() };
+    DB.credentials[key].password = tempPw;
+    localCacheSet('inv:auth:credentials', DB.credentials);
+
+    if(Array.isArray(DB.users)){
+      const u = DB.users.find(x => (x.email || '').toLowerCase() === key);
+      if(u) { u.password = tempPw; localCacheSet('inv:settings:users', DB.users); }
+    }
+
+    closeForgotPassword();
+    document.getElementById('loginEmail').value = email;
+    document.getElementById('loginPassword').value = '';
+    clearFieldErrors('loginEmailErr','loginPasswordErr');
+    smartekToast(`Password sementara Anda: ${tempPw}. Gunakan untuk masuk.`);
+  } finally {
+    if(btn){ btn.disabled = false; btn.innerHTML = origText; }
   }
-  closeForgotPassword();
-  document.getElementById('loginEmail').value = email;
-  document.getElementById('loginPassword').value = '';
-  clearFieldErrors('loginEmailErr','loginPasswordErr');
-  smartekToast('Password lama berhasil direset. Silakan buat password baru di tab "Daftar Akun".');
 };
