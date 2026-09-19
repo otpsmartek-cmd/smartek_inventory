@@ -112,6 +112,8 @@ function getItemsFromSheet(ss) {
     var category = String(row[3] || '').trim();
     var qty = Number(row[4]) || 0;
     var unit = String(row[5] || 'pcs').trim();
+    var min = Number(row[6]) || 0;
+    var price = Number(row[7]) || 0;
     var desc = String(row[8] || '').trim();
     var detail = String(row[9] || '').trim();
     // Jika kolom 9 adalah status (misal data format lama tanpa kolom detail)
