@@ -323,3 +323,13 @@
   .otp-boxes-wrap { gap: 6px; }
   .otp-digit { width: 38px; height: 46px; font-size: 19px; border-radius: 8px; }
 }
+
+#otpModalOverlay {
+  z-index: 99999 !important;
+}
+#resetPasswordOverlay {
+  z-index: 99998 !important;
+}
+#otpErr.show {
+  display: block !important;
+}
