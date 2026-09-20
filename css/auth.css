@@ -327,9 +327,16 @@
 #otpModalOverlay {
   z-index: 99999 !important;
 }
+#otpModalOverlay.open {
+  display: flex !important;
+}
 #resetPasswordOverlay {
   z-index: 99998 !important;
+}
+#resetPasswordOverlay.open {
+  display: flex !important;
 }
 #otpErr.show {
   display: block !important;
 }
+
